@@ -1,0 +1,44 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="420" viewBox="0 0 1400 420">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#334155"/>
+    </marker>
+    <style>
+      .entity { fill: #edf4ff; stroke: #334155; stroke-width: 2.5; }
+      .process { fill: #dfeee4; stroke: #2b6a4b; stroke-width: 3; }
+      .label { font: 700 20px 'Segoe UI', Arial, sans-serif; fill: #111827; }
+      .small { font: 600 14px 'Segoe UI', Arial, sans-serif; fill: #334155; }
+      .flow { stroke: #334155; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1400" height="420" fill="#f8f7f3"/>
+
+  <text x="700" y="42" text-anchor="middle" class="label">Level 0 DFD — Expense Tracker System Context</text>
+
+  <rect x="90" y="150" width="180" height="100" rx="10" class="entity"/>
+  <text x="180" y="192" text-anchor="middle" class="label">User</text>
+
+  <rect x="520" y="118" width="320" height="190" rx="20" class="process"/>
+  <text x="680" y="160" text-anchor="middle" class="small">Process 0</text>
+  <text x="680" y="210" text-anchor="middle" class="label">Expense Tracker</text>
+  <text x="680" y="238" text-anchor="middle" class="label">System</text>
+
+  <path d="M 270 178 L 520 178" class="flow"/>
+  <text x="395" y="158" text-anchor="middle" class="small">Registration data</text>
+  <text x="395" y="178" text-anchor="middle" class="small">Login credentials</text>
+  <text x="395" y="198" text-anchor="middle" class="small">Expense details</text>
+
+  <path d="M 270 243 L 520 243" class="flow"/>
+  <text x="395" y="263" text-anchor="middle" class="small">Filter criteria</text>
+  <text x="395" y="283" text-anchor="middle" class="small">Update and delete requests</text>
+
+  <path d="M 840 178 L 1080 178" class="flow"/>
+  <text x="960" y="158" text-anchor="middle" class="small">Authentication result</text>
+  <text x="960" y="178" text-anchor="middle" class="small">Expense list</text>
+  <text x="960" y="198" text-anchor="middle" class="small">Validation messages</text>
+
+  <path d="M 840 243 L 1080 243" class="flow"/>
+  <text x="960" y="263" text-anchor="middle" class="small">Total spending</text>
+  <text x="960" y="283" text-anchor="middle" class="small">Expense status updates</text>
+</svg>

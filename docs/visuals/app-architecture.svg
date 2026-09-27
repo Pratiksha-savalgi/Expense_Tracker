@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="760" viewBox="0 0 1300 760">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L0,12 L12,6 z" fill="#64748b"/>
+    </marker>
+    <style>
+      .title { font: 700 28px Arial; fill: #1f2937; }
+      .label { font: 700 18px Arial; fill: #2d3748; }
+      .small { font: 500 13px Arial; fill: #475569; }
+      .box { fill: #f7f7f7; stroke: #c8ced6; stroke-width: 2; }
+      .gray { fill: #f2f4f6; stroke: #d2d8df; stroke-width: 2; }
+      .green { fill: #eefbf2; stroke: #bfe2c8; stroke-width: 2; }
+      .line { stroke: #64748b; stroke-width: 2.8; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1300" height="760" fill="#1e1f22"/>
+  <rect x="90" y="60" width="1120" height="620" fill="#f1f2f4"/>
+
+  <text x="650" y="110" text-anchor="middle" class="title">Expense Tracker Architecture</text>
+
+  <rect x="150" y="170" width="150" height="110" rx="10" class="box"/>
+  <text x="225" y="210" text-anchor="middle" class="label">Users / Clients</text>
+  <text x="225" y="234" text-anchor="middle" class="small">User</text>
+  <text x="225" y="252" text-anchor="middle" class="small">Browser</text>
+
+  <rect x="360" y="150" width="200" height="150" rx="10" class="box"/>
+  <text x="460" y="190" text-anchor="middle" class="label">Frontend App</text>
+  <text x="460" y="217" text-anchor="middle" class="small">HTML + CSS + JS</text>
+  <text x="460" y="238" text-anchor="middle" class="small">Login / Register</text>
+  <text x="460" y="259" text-anchor="middle" class="small">Expense Dashboard</text>
+
+  <rect x="620" y="150" width="200" height="150" rx="10" class="box"/>
+  <text x="720" y="190" text-anchor="middle" class="label">Flask App</text>
+  <text x="720" y="217" text-anchor="middle" class="small">Auth</text>
+  <text x="720" y="238" text-anchor="middle" class="small">Validation</text>
+  <text x="720" y="259" text-anchor="middle" class="small">Expense Logic</text>
+
+  <rect x="880" y="170" width="160" height="110" rx="10" class="box"/>
+  <text x="960" y="210" text-anchor="middle" class="label">SQLite</text>
+  <text x="960" y="234" text-anchor="middle" class="small">Users</text>
+  <text x="960" y="252" text-anchor="middle" class="small">Expenses</text>
+
+  <line x1="300" y1="225" x2="360" y2="225" class="line"/>
+  <line x1="560" y1="225" x2="620" y2="225" class="line"/>
+  <line x1="820" y1="225" x2="880" y2="225" class="line"/>
+  <path d="M 720 300 L 720 360 L 840 360" class="line"/>
+
+  <rect x="240" y="370" width="250" height="150" rx="10" class="gray"/>
+  <text x="365" y="405" text-anchor="middle" class="label">Authentication</text>
+  <text x="365" y="432" text-anchor="middle" class="small">Login</text>
+  <text x="365" y="450" text-anchor="middle" class="small">Register</text>
+  <text x="365" y="468" text-anchor="middle" class="small">Session check</text>
+
+  <rect x="540" y="370" width="250" height="150" rx="10" class="gray"/>
+  <text x="665" y="405" text-anchor="middle" class="label">Authorization</text>
+  <text x="665" y="432" text-anchor="middle" class="small">User sees only own data</text>
+  <text x="665" y="450" text-anchor="middle" class="small">Edit/delete own expense only</text>
+  <text x="665" y="468" text-anchor="middle" class="small">No cross-user access</text>
+
+  <path d="M 790 445 L 840 445" class="line"/>
+
+  <rect x="840" y="370" width="240" height="150" rx="10" class="green"/>
+  <text x="960" y="405" text-anchor="middle" class="label">Business Logic</text>
+  <text x="960" y="432" text-anchor="middle" class="small">Expense validation</text>
+  <text x="960" y="450" text-anchor="middle" class="small">Category + date filter</text>
+  <text x="960" y="468" text-anchor="middle" class="small">Total spending</text>
+
+  <path d="M 365 520 L 365 570 L 760 570 L 760 520" class="line"/>
+  <text x="575" y="595" text-anchor="middle" class="small">Data flow and request handling</text>
+
+  <text x="730" y="670" text-anchor="middle" class="small">Simple handson project: HTML, CSS, JavaScript, Flask, SQLite</text>
+</svg>
