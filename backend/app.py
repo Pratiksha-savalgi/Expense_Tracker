@@ -100,6 +100,62 @@ def parse_expense_form(form):
     }, errors
 
 
+def get_category_analytics(user_id, target_month):
+    if not target_month:
+        target_month = date.today().strftime("%Y-%m")
+
+    try:
+        year, month = (int(part) for part in target_month.split("-"))
+        if month < 1 or month > 12:
+            raise ValueError
+        date(year, month, 1)
+    except (ValueError, TypeError):
+        target_month = date.today().strftime("%Y-%m")
+
+    with database_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT category, SUM(CAST(amount AS REAL)) AS total
+            FROM expenses
+            WHERE user_id = ? AND substr(expense_date, 1, 7) = ?
+            GROUP BY category
+            ORDER BY total DESC, category COLLATE NOCASE ASC
+            """,
+            (user_id, target_month),
+        ).fetchall()
+
+    analytics = []
+    month_total = Decimal("0")
+    for row in rows:
+        row_total = Decimal(str(row["total"]))
+        month_total += row_total
+        analytics.append({
+            "category": row["category"],
+            "total": row_total,
+        })
+
+    if analytics:
+        for item in analytics:
+            item["percentage"] = (item["total"] / month_total * Decimal("100")) if month_total > 0 else Decimal("0")
+    else:
+        for item in analytics:
+            item["percentage"] = Decimal("0")
+
+    highest_category = None
+    lowest_category = None
+    if analytics:
+        highest_category = max(analytics, key=lambda item: item["total"])
+        lowest_category = min(analytics, key=lambda item: item["total"])
+
+    return {
+        "month": target_month,
+        "items": analytics,
+        "total": month_total,
+        "highest_category": highest_category,
+        "lowest_category": lowest_category,
+    }
+
+
 @app.get("/")
 def home():
     if "user_id" in session:
@@ -181,6 +237,7 @@ def logout():
 def dashboard():
     category_filter = request.args.get("category", "").strip()
     date_filter = request.args.get("date", "").strip()
+    analytics_month = request.args.get("analytics_month", date.today().strftime("%Y-%m")).strip()
     if date_filter:
         try:
             parsed_date = date.fromisoformat(date_filter)
@@ -189,6 +246,15 @@ def dashboard():
         except ValueError:
             flash("Choose a valid date to filter expenses.", "error")
             date_filter = ""
+
+    try:
+        year, month = (int(part) for part in analytics_month.split("-"))
+        if month < 1 or month > 12:
+            raise ValueError
+        date(year, month, 1)
+    except (ValueError, TypeError):
+        flash("Choose a valid month for category analytics.", "error")
+        analytics_month = date.today().strftime("%Y-%m")
 
     conditions = ["user_id = ?"]
     values = [session["user_id"]]
@@ -212,6 +278,7 @@ def dashboard():
         ).fetchall()
 
     total = sum((Decimal(expense["amount"]) for expense in expenses), Decimal("0"))
+    analytics = get_category_analytics(session["user_id"], analytics_month)
     return render_template(
         "view_expenses.html",
         expenses=expenses,
@@ -219,6 +286,11 @@ def dashboard():
         category_filter=category_filter,
         date_filter=date_filter,
         total=total,
+        analytics_month=analytics["month"],
+        analytics_items=analytics["items"],
+        analytics_total=analytics["total"],
+        highest_category=analytics["highest_category"],
+        lowest_category=analytics["lowest_category"],
     )
 
 
