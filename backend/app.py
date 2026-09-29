@@ -100,6 +100,67 @@ def parse_expense_form(form):
     }, errors
 
 
+def get_budget_summary(user_id, month=None, year=None):
+    selected_month = int(month) if month is not None else date.today().month
+    selected_year = int(year) if year is not None else date.today().year
+
+    with database_connection() as connection:
+        budget = connection.execute(
+            "SELECT id, budget_amount FROM budgets WHERE user_id = ? AND month = ? AND year = ?",
+            (user_id, selected_month, selected_year),
+        ).fetchone()
+        total_spent_row = connection.execute(
+            "SELECT COALESCE(SUM(CAST(amount AS REAL)), 0) AS total_spent FROM expenses "
+            "WHERE user_id = ? AND CAST(strftime('%Y', expense_date) AS INTEGER) = ? "
+            "AND CAST(strftime('%m', expense_date) AS INTEGER) = ?",
+            (user_id, selected_year, selected_month),
+        ).fetchone()
+
+    spent = Decimal(str(total_spent_row["total_spent"])) if total_spent_row and total_spent_row["total_spent"] is not None else Decimal("0")
+    budget_amount = Decimal(str(budget["budget_amount"])) if budget else None
+
+    if budget_amount is None:
+        return {
+            "month": selected_month,
+            "year": selected_year,
+            "budget_amount": None,
+            "total_spent": spent,
+            "remaining": None,
+            "utilization": Decimal("0"),
+            "status": "not_set",
+            "status_label": "No budget set",
+            "message": "Set a monthly budget to track your spending.",
+        }
+
+    remaining = budget_amount - spent
+    utilization = (spent / budget_amount * Decimal("100")) if budget_amount else Decimal("0")
+
+    if spent > budget_amount:
+        status = "exceeded"
+        status_label = "Budget exceeded"
+        message = "You have spent more than your monthly budget."
+    elif utilization >= Decimal("80"):
+        status = "warning"
+        status_label = "Warning"
+        message = "You are close to your monthly budget limit."
+    else:
+        status = "healthy"
+        status_label = "On track"
+        message = "You are within your monthly budget."
+
+    return {
+        "month": selected_month,
+        "year": selected_year,
+        "budget_amount": budget_amount,
+        "total_spent": spent,
+        "remaining": remaining,
+        "utilization": utilization,
+        "status": status,
+        "status_label": status_label,
+        "message": message,
+    }
+
+
 @app.get("/")
 def home():
     if "user_id" in session:
@@ -181,6 +242,9 @@ def logout():
 def dashboard():
     category_filter = request.args.get("category", "").strip()
     date_filter = request.args.get("date", "").strip()
+    month = request.args.get("month", str(date.today().month)).strip() or str(date.today().month)
+    year = request.args.get("year", str(date.today().year)).strip() or str(date.today().year)
+
     if date_filter:
         try:
             parsed_date = date.fromisoformat(date_filter)
@@ -212,6 +276,7 @@ def dashboard():
         ).fetchall()
 
     total = sum((Decimal(expense["amount"]) for expense in expenses), Decimal("0"))
+    budget_summary = get_budget_summary(session["user_id"], month=month, year=year)
     return render_template(
         "view_expenses.html",
         expenses=expenses,
@@ -219,7 +284,59 @@ def dashboard():
         category_filter=category_filter,
         date_filter=date_filter,
         total=total,
+        budget=budget_summary,
+        selected_month=budget_summary["month"],
+        selected_year=budget_summary["year"],
     )
+
+
+@app.post("/budget")
+@login_required
+def save_budget():
+    month = request.form.get("month", "").strip()
+    year = request.form.get("year", "").strip()
+    amount = request.form.get("budget_amount", "").strip()
+    errors = []
+
+    if not month or not year:
+        errors.append("Choose a valid month and year for the budget.")
+    else:
+        try:
+            month_value = int(month)
+            year_value = int(year)
+            if month_value < 1 or month_value > 12:
+                raise ValueError
+            if year_value < 2000:
+                raise ValueError
+        except ValueError:
+            errors.append("Choose a valid month and year.")
+            month_value = None
+            year_value = None
+
+    if not amount:
+        errors.append("Enter a monthly budget amount.")
+    else:
+        try:
+            budget_value = Decimal(amount)
+            if not budget_value.is_finite() or budget_value <= 0:
+                errors.append("Budget must be greater than zero.")
+        except InvalidOperation:
+            errors.append("Enter a valid budget amount greater than zero.")
+
+    if errors:
+        for error in errors:
+            flash(error, "error")
+        return redirect(url_for("dashboard", month=month or date.today().month, year=year or date.today().year))
+
+    with database_connection() as connection:
+        connection.execute(
+            "INSERT INTO budgets (user_id, month, year, budget_amount, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP) "
+            "ON CONFLICT(user_id, month, year) DO UPDATE SET budget_amount = excluded.budget_amount, updated_at = CURRENT_TIMESTAMP",
+            (session["user_id"], month_value, year_value, format(budget_value, "f")),
+        )
+
+    flash("Monthly budget saved.", "success")
+    return redirect(url_for("dashboard", month=month_value, year=year_value))
 
 
 @app.route("/expenses/add", methods=["GET", "POST"])
