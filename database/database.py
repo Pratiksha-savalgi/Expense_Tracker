@@ -46,7 +46,21 @@ def initialize_database():
                 description TEXT NOT NULL DEFAULT ''
             );
 
+            CREATE TABLE IF NOT EXISTS budgets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                month INTEGER NOT NULL,
+                year INTEGER NOT NULL,
+                budget_amount TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, month, year)
+            );
+
             CREATE INDEX IF NOT EXISTS expenses_by_user_date
                 ON expenses(user_id, expense_date);
+
+            CREATE INDEX IF NOT EXISTS budgets_by_user_month
+                ON budgets(user_id, year, month);
             """
         )
