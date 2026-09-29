@@ -258,6 +258,173 @@ Non-Functional Requirements
 NFR-01: Security: Users should only be able to access their own
 expenses.
 
+## Version 2 Requirements (Budget Tracking and Category Analytics)
+
+### 2.2 Version 2 Scope
+
+The Version 2 release extends the Expense Tracker from basic expense
+recording into a monthly personal budget and analytics dashboard.
+
+It adds two major capabilities:
+
+1. Monthly Budget Tracking
+2. Category-wise Analytics
+
+These features build on the existing login, expense CRUD, and user
+scoping model without removing or replacing the Version 1 functionality.
+
+### Version 2 Functional Requirements
+
+FR-10: Monthly Budget Configuration: The user should be able to set a
+monthly budget amount for a specific month.
+
+FR-11: Update Monthly Budget: The user should be able to update an
+existing monthly budget without losing previous budget history.
+
+FR-12: View Remaining Budget: The user should be able to see how much of
+budget remains after spending.
+
+FR-13: View Budget Utilization: The user should be able to see the
+percentage of budget used.
+
+FR-14: Budget Comparison: The user should be able to compare current
+monthly spending against the configured budget.
+
+FR-15: Budget Warning: The system should notify the user when spending is
+approaching the budget limit.
+
+FR-16: Budget Exceeded Alert: The system should notify the user when
+spending exceeds the budget.
+
+FR-17: Persist Budget Data: Budget values should be stored in the
+application database so they remain available across sessions.
+
+FR-18: Dashboard Budget Status: The user should see budget status on the
+main dashboard or relevant screens.
+
+FR-19: Category Contribution: The user should be able to see category
+contribution percentages for monthly spending.
+
+FR-20: Monthly Analytics: The user should be able to view analytics for a
+selected month.
+
+FR-21: Identify Spending Extremes: The user should be able to identify
+highest-spending and lowest-spending categories.
+
+FR-22: Graphical Summary: The user should be able to view a chart or
+visual representation of category spending.
+
+### Version 2 Non-Functional Requirements
+
+NFR-02: Budget Awareness: The system should provide clear and timely
+visual feedback when spending is approaching or exceeding budget.
+
+NFR-03: Data Accuracy: Category totals and percentages must accurately
+reflect the user’s actual expense records.
+
+NFR-04: Dashboard Usability: Budget and analytics information should be
+presented clearly without disrupting existing expense workflows.
+
+NFR-05: Performance: Budget and analytics calculations should remain fast
+for typical monthly datasets.
+
+### Version 2 User Stories
+
+User-09: Monthly Budget Tracking
+
+As a user, I want to set a monthly budget so that I can control my
+spending and know how much I have left.
+
+User-10: Budget Alerts
+
+As a user, I want warnings when I am close to or over budget so that I
+can adjust my spending.
+
+User-11: Category Analytics
+
+As a user, I want to see my spending by category so that I can identify
+where most of my money is going.
+
+User-12: Monthly Comparison
+
+As a user, I want to compare my monthly spending against my budget so that
+I can plan better for the month.
+
+User-13: Dashboard Review
+
+As a user, I want budget and analytics information available on the
+dashboard so that I can review my financial status quickly.
+
+### Version 2 Acceptance Criteria
+
+AC-21: Monthly budget can be configured and stored for the logged-in user.
+
+AC-22: Existing monthly budget can be updated and saved successfully.
+
+AC-23: Remaining budget is calculated correctly after expenses are
+entered.
+
+AC-24: Budget utilization percentage is displayed correctly.
+
+AC-25: Warning is shown when spending reaches a defined threshold near the
+budget limit.
+
+AC-26: Alert is shown when actual spending exceeds the configured budget.
+
+AC-27: Category totals are calculated correctly for the selected month.
+
+AC-28: Category contribution percentages are calculated correctly.
+
+AC-29: The highest and lowest spending categories are identified.
+
+AC-30: Analytics display remains visible without blocking expense records
+or CRUD operations.
+
+### Version 2 Assumptions
+
+- Each user maintains an independent budget and analytics view.
+- The system evaluates budget against the user’s own recorded expenses.
+- Monthly budget values are stored by month and year.
+- Categories are shared across the user’s expense records.
+- Chart display may be simplified to a bar or percentage view if a complex
+  chart library is not required.
+
+### Version 2 Constraints
+
+- The project must remain within the approved stack unless a lightweight
+  visualization dependency is absolutely necessary.
+- Budget and analytic features must enhance the existing app without
+  disrupting the current login and expense workflows.
+- Budget operations must respect the same user-scoping model used for
+  expense data.
+- A budget should be calculated from the logged-in user’s records only.
+
+### Version 2 Dependencies
+
+- Existing user records and authentication model
+- Existing expense records and category fields
+- Monthly date handling and financial calculations
+- Updated dashboard and template rendering flow
+- Optional charting support for data visualization if approved later
+
+### Version 2 Data and Validation Requirements
+
+- A budget amount must be greater than zero.
+- Budget records must be linked to a valid user.
+- Budget records must be tracked by month and year.
+- Category totals must match the sum of that user’s expenses for the
+  selected month.
+- Percentages must be calculated from total monthly expenditure and not
+  from unrelated records.
+- Empty datasets must show either a blank state or zero-value summary
+  without errors.
+
+### Version 2 Summary
+
+This extended release keeps the Expense Tracker useful for daily expense
+recording, while adding the financial planning features needed for better
+monthly control and clearer category-based understanding of spending.
+
 NFR-02: Password Security: User passwords should not be stored as plain
 text.
 

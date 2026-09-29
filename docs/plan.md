@@ -130,6 +130,77 @@ On the view page, the user can filter expenses by category and date. Flask (and 
 **Total spending**  
 The view page shows the total amount spent. Flask calculates the total from the logged-in user’s expenses and the system displays that total expense amount.
 
+## Version 2 Implementation Roadmap
+
+The Version 2 release extends the app with monthly budget management and category-wise analytics while preserving the original workflow.
+
+### Phase 1: Database enhancement
+
+- Add a `budgets` table to store user-specific monthly budget values.
+- Ensure budget rows are linked to user ID, month, and year.
+- Confirm schema supports one active budget per user and month.
+- Validate that the existing `expenses` table continues to support category aggregation queries.
+
+### Phase 2: Budget tracking backend
+
+- Build backend logic for budget creation and update.
+- Add calculation for remaining budget and month-wise total spend.
+- Implement warning threshold checks and exceeded-budget logic.
+- Ensure each calculation is scoped to the logged-in user.
+
+### Phase 3: Budget tracking frontend
+
+- Add a dashboard budget card or management form.
+- Display remaining amount and percentage utilized.
+- Show warning and exceeded states clearly on relevant screens.
+- Add empty-state handling when no monthly budget is configured.
+
+### Phase 4: Analytics backend
+
+- Create summary queries for total spend by category.
+- Add monthly filtering logic for category analysis.
+- Calculate category percentages and identify highest and lowest categories.
+- Ensure analytics use authenticated user records only.
+
+### Phase 5: Analytics frontend
+
+- Add category summary cards and visual components.
+- Render bar charts or percentage blocks for categories.
+- Include a month selector for analytics review.
+- Keep the dashboard simple and readable for everyday use.
+
+### Phase 6: Testing
+
+- Test budget set/update flows.
+- Test remaining budget and utilization calculations.
+- Test warning and exceed states.
+- Test category aggregation temperature and percentage logic.
+- Test empty and invalid data behavior.
+
+### Phase 7: Integration validation
+
+- Verify that expense CRUD still works after budget and analytics are added.
+- Confirm dashboard and analytics display do not break session behavior.
+- Validate user-specific visibility and access restrictions.
+- Run end-to-end acceptance checks for both Version 1 and Version 2 flows.
+
+### Phase 8: Release preparation
+
+- Review the updated documentation for consistency.
+- Confirm database schema, UI changes, and route design are aligned.
+- Validate release readiness for budget and analytics functionality.
+- Prepare release notes covering new features and usage examples.
+
+## Version 2 milestones and priorities
+
+**Priority 1:** Monthly budget tracking foundation and backend logic.
+
+**Priority 2:** Dashboard visibility for remaining budget and warning states.
+
+**Priority 3:** Category analytics backend and dashboard summary.
+
+**Priority 4:** Testing, validation, and release documentation.
+
 ## Validation and security considerations
 
 **Validation**

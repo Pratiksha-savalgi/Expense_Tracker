@@ -261,6 +261,334 @@ Behavior:
 
 ---
 
+## 8. Version 2 Design Extensions
+
+### 8.1 Monthly Budget Tracking Design
+
+#### Budget storage strategy
+
+The system stores monthly budget information separately from individual
+expense records. A dedicated budget table is recommended so that budget
+values can be managed independently and updated without altering the
+expense record history.
+
+Recommended fields:
+
+- id
+- user_id
+- month
+- year
+- budget_amount
+- created_at
+- updated_at
+
+This supports one budget per user per month, which avoids duplicate budget
+entries and keeps comparisons clear.
+
+#### Budget calculation logic
+
+For a given user and selected month, the system should: 
+
+1. read the budget value for that month
+2. sum all expense amounts for the same user and month
+3. calculate remaining balance = budget_amount - total_spent
+4. calculate utilization percentage = (total_spent / budget_amount) * 100
+
+If the user has not configured a budget for that month, the system should
+show a default empty-state message rather than calculate a misleading value.
+
+#### Remaining balance calculations
+
+remaining_balance = configured_budget - total_monthly_spending
+
+The remaining balance is shown in the dashboard and relevant budget panel.
+If the value is negative, the system should display it as overspent and
+highlight the state as exceeded.
+
+#### Warning threshold logic
+
+The system should evaluate a warning threshold as a ratio of actual spend vs
+budget. A common design is to warn when utilization is at or above 80% or
+90% of the configured monthly budget. This should be configurable in the
+backend logic but easy to display in the UI.
+
+Example:
+
+- warning threshold = 80%
+- budget = ₹20,000
+- spend = ₹16,500
+- utilization = 82.5%
+- result = warning banner displayed
+
+#### Exceeded budget logic
+
+If total_monthly_spending > budget_amount, the status should change to
+exceeded. The alert should be visible in the dashboard and can also be used
+in the budget summary box. This is useful for highlighting overspending at a
+glance.
+
+### 8.2 Analytics Design
+
+#### Category aggregation flow
+
+The analytics module should retrieve all valid expenses for the logged-in
+user and selected month. It then groups those records by category and sums
+their amounts.
+
+Flow:
+
+1. User selects a month.
+2. Flask queries expenses for that month and user.
+3. The backend groups by category.
+4. The backend calculates total monthly spend.
+5. Each category total is converted into a contribution percentage.
+6. Results are sent to the dashboard template for rendering.
+
+#### Analytics computation logic
+
+For each category:
+
+category_total = sum of expense amounts for that category
+category_percentage = (category_total / total_monthly_spend) * 100
+
+The dashboard can then show:
+
+- category name
+- total spent in the category
+- percentage share of total monthly spend
+- highlighted highest and lowest categories
+
+#### Dashboard integration
+
+The budget and analytics panels should be integrated into the main dashboard
+or expense summary page. This keeps the user in the normal workflow while
+allowing quick review of their spending. The pages should remain simple and
+not require complex navigation.
+
+#### Visualization requirements
+
+Visualization is recommended in a lightweight form for a small personal
+application. Simple bar charts, progress bars, or donut-style summary cards
+are enough to meet the requirement without adding unnecessary complexity.
+
+The UI should support:
+
+- category totals
+- percentage bars
+- monthly comparison against budget
+- empty-state handling when no expense data exists
+
+### 8.3 Data Model Design
+
+The current data model remains centered on the existing `users` and
+`expenses` tables, with a new `budgets` table added for Version 2.
+
+#### Core entities
+
+- `users`: stores account and authentication data
+- `expenses`: stores user-owned spending entries, category, date, and amount
+- `budgets`: stores month-based budget limits per user
+
+#### Budget table design
+
+```sql
+CREATE TABLE budgets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+    budget_amount TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, month, year),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+);
+```
+
+This model keeps the budget data separate from the expense log, lets the
+system support one active budget per month, and makes budget updates easy to
+control.
+
+#### Query requirements for analytics
+
+The following analytical queries are required:
+
+- total expense by category for a user and month
+- percentage contribution by category
+- monthly category summary for dashboard display
+- budget vs actual spend calculation
+- highest-spending and lowest-spending category detection
+
+Example query patterns:
+
+```sql
+SELECT category, SUM(amount) AS total
+FROM expenses
+WHERE user_id = ? AND expense_date BETWEEN ? AND ?
+GROUP BY category
+ORDER BY total DESC;
+```
+
+```sql
+SELECT SUM(amount) AS monthly_total
+FROM expenses
+WHERE user_id = ? AND expense_date BETWEEN ? AND ?;
+```
+
+```sql
+SELECT month, year, budget_amount
+FROM budgets
+WHERE user_id = ?
+ORDER BY year DESC, month DESC;
+```
+
+These queries should be used in the Flask backend to produce summary
+values for the dashboard and analytics panel.
+
+### 8.4 Route and Page Design
+
+The Version 2 design should extend the current application flow without
+changing the basic user journey.
+
+#### Route design
+
+- `GET /dashboard` or equivalent dashboard view: displays the monthly budget card, remaining amount, utilization percentage, and spending summary.
+- `POST /budget` or similar: creates or updates a month budget.
+- `GET /analytics`: shows category totals, percentages, and visual summary for the selected month.
+- `GET /expenses` or related expense listing: keeps the original expense list and filters available.
+
+#### Page design
+
+- Budget panel on the dashboard: shows current month budget, remaining amount, and status indicator.
+- Analytics panel: shows category totals and percentage bars or chart blocks.
+- Filter controls: selected month dropdown or date selector for analytics.
+- Empty-state blocks: shown when no data exists for a selected month.
+
+This maintains a simple layout where the user remains in the same workflow:
+login, view expenses, review budget, analyze categories, and continue working
+with expense records.
+
+### 8.5 Security Design
+
+The Version 2 features must follow the same access-control model as the base
+application.
+
+Key rules:
+
+- budget records belong to the logged-in user
+- analytics data is limited to the current user’s expenses
+- a user cannot view another user’s monthly budget or category totals
+- all budget and analytics routes must require active authentication
+- no personally sensitive financial data should be exposed outside the
+  authenticated session
+
+The user-specific access model remains identical to the base Expense Tracker
+and is not expanded beyond the logged-in user scope.
+
+### 8.6 Validation Design
+
+Validation is required for both budget management and analytics presentation.
+
+#### Budget validation
+
+- amount must be greater than zero
+- month and year must be valid
+- duplicate month entries for the same user should be handled by update
+- empty or invalid values must trigger user-friendly messages
+
+#### Analytics validation
+
+- totals are computed only for valid expenses for the selected month
+- invalid month values are rejected or reset to the current month
+- empty categories and empty months show a clean no-data message
+- calculations must avoid division by zero when total spend is zero
+
+### 8.7 User Experience Design
+
+The user experience should remain clear and lightweight.
+
+Design goals:
+
+- show budget status without overwhelming the user
+- keep per-month financial summaries visible and understandable
+- highlight warning and exceeded states with color and text labels
+- use simple category bars or summary cards instead of complex interfaces
+- keep expense entry and dashboard review in the same workflow
+
+This approach matches the project’s beginner-friendly positioning while still
+providing useful monthly planning and analytics insights.
+
+### 8.8 Database Design Changes
+
+The current SQLite design should be extended with a budget table and a
+limited analytics query approach. No full redesign of the existing
+architecture is required.
+
+#### Recommended schema additions
+
+```sql
+CREATE TABLE budgets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+    budget_amount TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, month, year),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+);
+```
+
+The `budget_amount` should be stored as a decimal-friendly value in SQLite,
+matching the existing expense amount behavior. The user_id and month/year
+combination ensures one active budget per user per month.
+
+#### Query requirements for analytics
+
+The following analytical queries are required:
+
+- total expense by category for a user and month
+- percentage contribution by category
+- monthly category summary for dashboard display
+- budget vs actual spend calculation
+- highest-spending and lowest-spending category detection
+
+Example query patterns:
+
+```sql
+SELECT category, SUM(amount) AS total
+FROM expenses
+WHERE user_id = ? AND expense_date BETWEEN ? AND ?
+GROUP BY category
+ORDER BY total DESC;
+```
+
+```sql
+SELECT SUM(amount) AS monthly_total
+FROM expenses
+WHERE user_id = ? AND expense_date BETWEEN ? AND ?;
+```
+
+```sql
+SELECT month, year, budget_amount
+FROM budgets
+WHERE user_id = ?
+ORDER BY year DESC, month DESC;
+```
+
+These queries should be used in the Flask backend to produce summary
+values for the dashboard and analytics panel.
+
+### 8.9 Version 2 Design Summary
+
+The Version 2 design intentionally extends but does not replace the current
+Expense Tracker model. It adds user-specific budget tracking and lightweight
+category analytics while maintaining the clean architecture already used by
+Flask and SQLite.
+
+---
+
 ## 7. Data model
 
 ### 7.1 Users table

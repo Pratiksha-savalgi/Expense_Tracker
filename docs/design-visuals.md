@@ -41,3 +41,53 @@ This architecture is designed for a lightweight application and includes only th
 ![Expense Dashboard Wireframe](visuals/expenses-dashboard-wireframe.svg)
 
 These visuals are intentionally kept simple, presentation-friendly, and aligned with the Expense Tracker business system and its core data flows.
+
+## 7. Version 2 Monthly Budget Tracking Flow
+
+```mermaid
+flowchart TD
+    A[User opens dashboard] --> B[User sets monthly budget]
+    B --> C[Validate budget amount]
+    C --> D[Store budget in database]
+    D --> E[User adds expenses]
+    E --> F[Calculate total monthly spend]
+    F --> G{Spend >= budget?}
+    G -- No --> H[Show remaining budget and utilization]
+    G -- Yes --> I[Show exceeded budget alert]
+    H --> J{Spend >= warning threshold?}
+    J -- Yes --> K[Show warning banner]
+    J -- No --> L[Normal budget status]
+    I --> M[Dashboard summary update]
+    K --> M
+    L --> M
+```
+
+This flow explains the user experience for monthly budget configuration,
+remaining balance calculation, warning state management, and the final
+visual status shown on the dashboard.
+
+## 8. Version 2 Category Analytics Flow
+
+```mermaid
+flowchart TD
+    A[User opens analytics section] --> B[Select month]
+    B --> C[Fetch user expenses for month]
+    C --> D[Group by category]
+    D --> E[Calculate category totals]
+    E --> F[Calculate category contribution percentage]
+    F --> G[Find highest and lowest category]
+    G --> H[Render chart and category summary]
+    H --> I[Display dashboard analytics view]
+```
+
+This flow shows how the system aggregates user expenses into category-level
+insights, computes percentages, and presents the results in a readable and
+decision-supportive dashboard layout.
+
+## 9. Version 2 UI Interpretation
+
+The Version 2 visual design continues the same lightweight and practical
+approach as the original project. It adds dashboard cards for budget status,
+remaining balance, utilization percentage, and category charts without
+changing the basic user interaction style or the core Expense Tracker
+workflow.

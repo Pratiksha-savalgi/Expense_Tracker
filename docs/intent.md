@@ -23,3 +23,42 @@ Each user should only see and manage their own expenses.
 ## Main goal
 
 Give users a simple way to record and manage personal expenses in one place, stay organized, and understand their spending through basic totals and categories.
+
+## Version 2: Why this next step is required
+
+The initial Expense Tracker solves the core problem of recording expenses, but personal financial management becomes much more useful when the user can compare spending to a plan. Version 2 adds monthly budget controls and category-based analysis so the user can move beyond tracking records and begin actively managing financial behavior.
+
+## Business value
+
+Budget tracking and category analytics provide direct business value because they turn the app from a passive log into a decision-support tool. Instead of simply storing historical expenses, the system helps the user detect overspending, understand major spending categories, and plan upcoming monthly costs more effectively.
+
+## User value
+
+Users benefit because they can:
+
+- set a monthly spending limit
+- see how much is left to spend
+- understand which categories consume the most funds
+- monitor whether they are close to or beyond budget
+- decide where to reduce spending based on real trend data
+
+## Expected benefits
+
+- Better control of monthly spending
+- Reduced risk of accidental overspending
+- Faster understanding of spending patterns
+- Clearer visibility into the categories that matter most
+- More useful dashboard feedback for day-to-day financial decisions
+
+## Success metrics
+
+A successful Version 2 implementation should show that:
+
+- the user can create and update a month budget successfully
+- remaining balance and percentage used are accurate
+- warning and exceedance states appear at the right thresholds
+- cost summaries are correct by category and month
+- the dashboard displays financial status clearly without interrupting the normal expense workflow
+- users can understand their spending patterns in under a short review cycle
+
+The Version 2 goals extend the original application toward practical personal finance support while preserving the simple and beginner-friendly experience of the existing Expense Tracker.

@@ -139,3 +139,151 @@ When viewing expenses, amount, category, date, and description should be visible
 **Total Spending**
 
 - System displays the total expense amount.
+
+## Version 2 Feature Specification
+
+### Monthly Budget Tracking
+
+#### Feature description
+
+The monthly budget feature allows a logged-in user to define a financial
+limit for a specific month and compare future spending against that limit.
+The system stores a budget entry for the relevant month and year, then
+calculates the user’s remaining budget and percentage used.
+
+#### Workflow definition
+
+1. The user selects a month and enters a budget amount.
+2. The system validates the amount and saves the budget to the database.
+3. The user continues adding expenses for that month.
+4. The system calculates total spending for the month.
+5. The system compares actual spending to the budget.
+6. If spending reaches a warning threshold, a warning is displayed.
+7. If spending exceeds the budget, an alert is shown.
+8. The result is shown on the dashboard and relevant expense views.
+
+#### Validation rules
+
+- Budget amount must be greater than 0.
+- A budget must be associated with a valid logged-in user.
+- A budget must belong to a month and year.
+- Duplicate entries for the same month and user should be handled by
+  update-in-place instead of creating overlapping budget records.
+- Invalid or empty values must be rejected with a clear message.
+
+#### Business rules
+
+- Budget is calculated per user and per month.
+- Budget should be independent from individual expense records.
+- Expenses outside the selected month are excluded from monthly budget
+  calculations.
+- The warning threshold may be defined as a percentage of the budget, for
+  example 80% or 90%.
+- The alert state is triggered when actual spending exceeds the monthly
+  budget.
+
+#### Error handling
+
+- Invalid numeric values show an error and do not save the budget.
+- Missing budget data shows an empty or zero-state summary.
+- If no budget is configured for the selected month, the dashboard should
+  show a default message rather than a broken value.
+- If category totals are empty, the analytics page should still render a
+  valid empty-state message.
+
+#### Database impacts
+
+- A new budget table should store budget amount, user ID, month, year, and
+  timestamps.
+- Budget data should be keyed by user and month to prevent duplicate
+  overlapping records.
+- The system should support updating the same month’s budget without
+  creating duplicate rows.
+
+#### UI impacts
+
+- Budget entry controls appear in the dashboard or settings panel.
+- Remaining amount and utilization percentage are visible.
+- Warning and exceeded messages appear in a clear status banner or panel.
+- Budget status should not block normal expense entry or viewing.
+
+### Category-wise Analytics
+
+#### Feature description
+
+The analytics feature summarizes expense data by category for a selected
+month. It helps the user understand where the majority of spending occurs
+and which categories are most or least expensive.
+
+#### Workflow definition
+
+1. The user opens the dashboard or analytics section.
+2. The system selects the current month or a chosen month from the UI.
+3. The system groups the user’s expenses by category.
+4. The system calculates total spending per category.
+5. The system calculates each category’s contribution percentage.
+6. The dashboard displays totals and visual summaries.
+7. The user can identify the highest- and lowest-spending categories.
+
+#### Validation rules
+
+- Category totals are derived from valid expenses only.
+- Expenses without a valid user or category must be excluded from the
+  summary.
+- The analytics view must respect the selected month and the user’s owned
+  records.
+- Category percentages must be based on the visible total for the selected
+  month.
+
+#### Business rules
+
+- The system should aggregate by category only for the logged-in user.
+- The grand total for the selected month is the denominator for category
+  percentages.
+- Categories with zero spend should not appear as positive contribution
+  values unless intentionally displayed as empty state items.
+- The dashboard should still allow standard CRUD actions outside the
+  analytics section.
+
+#### Error handling
+
+- No data for the selected month should display a friendly empty state.
+- Invalid month filters should be rejected and reset to the current month.
+- Analytics calculations should fail gracefully without affecting the main
+  expense workflow.
+
+#### Database impacts
+
+- Analytics queries will use expense records and category values already
+  stored for the user.
+- It is recommended to identify categories using the existing expense
+  table and to aggregate with GROUP BY category, user_id, and month.
+- The dashboard should not require a separate analytics warehouse for the
+  initial Version 2 design.
+
+#### UI impacts
+
+- A summary panel shows category totals and percentages.
+- Charts or horizontal bars display category contribution visually.
+- A selected month filter updates analytics without reloading the full
+  application experience.
+- The screen should remain readable and lightweight for personal use.
+
+## Version 2 Security and Access Rules
+
+- Budget and analytics data must be user-scoped.
+- A user cannot view another user’s budget or category summaries.
+- Budget and analytics calculations must use only authenticated session
+  data.
+- The app must continue to enforce password hashing and user-specific
+  access rules.
+
+## Version 2 Acceptance Criteria Summary
+
+- Users can set and update monthly budgets.
+- Remaining budget and utilization percentages are accurate.
+- Users receive warnings when near or over budget.
+- Monthly category totals and percentages are calculated correctly.
+- The highest and lowest spending categories are visible.
+- Budget and analytics views integrate smoothly with the existing dashboard
+  and expense management flow.

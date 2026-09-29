@@ -51,3 +51,77 @@ The development server listens at `http://127.0.0.1:5000`.
 The implementation uses usernames because that was explicitly requested. The existing requirements, specification, and testcase-plan documents still describe email-based authentication; they were left unchanged under the documentation-protection instruction. Update those references separately if the username behavior is now the intended project requirement.
 
 Budgeting, payment-method tracking, keyword search, and other unapproved features remain out of scope.
+
+## Version 2 Scope Extension
+
+Version 2 adds two major capabilities to the Expense Tracker:
+
+1. Monthly Budget Tracking
+2. Category-wise Analytics
+
+These features are intended to make the application more useful for personal financial planning without changing the current core user experience.
+
+### New Capabilities
+
+- Monthly budget creation and update for the logged-in user
+- Monthly remaining balance calculation
+- Budget utilization percentage display
+- Budget warning and over-budget alerts
+- Total spending by category for a selected month
+- Category contribution percentages
+- Summary information for highest- and lowest-spending categories
+- Dashboard-level presentation of budget and analytics status
+
+### Expected Deliverables
+
+- Budget table and budget management logic in the data layer
+- Backend calculations for budget remaining, utilization, and warning states
+- Category aggregation queries for dashboard analytics
+- UI enhancements to show budget and category summary panels
+- Testing documentation covering budget and analytics flows
+
+### Database Changes
+
+A new `budgets` table is recommended with:
+
+- id
+- user_id
+- month
+- year
+- budget_amount
+- created_at
+- updated_at
+
+This keeps budget values separate from the expense log while allowing the app to compare actual spend against monthly capacity.
+
+### API and Backend Changes
+
+The backend should expose logic for:
+
+- creating or updating a monthly budget
+- retrieving remaining budget for the active month
+- calculating budget utilization percentage
+- aggregating monthly spend by category
+- calculating weighted category percentages
+- exposing summary data to the dashboard template
+
+### UI Changes
+
+- Budget card on the dashboard
+- Monthly budget form or settings area
+- Warning and exceeded-state banners
+- Category summary list or chart area
+- Month filter for analytics review
+
+### Testing Impact
+
+The Version 2 scope will require new validation coverage for:
+
+- valid and invalid budget values
+- warning and exceeded states
+- total and percentage accuracy
+- category aggregation correctness
+- empty month data handling
+- dashboard rendering accuracy
+
+This keeps the project aligned with the intended evolution from a simple expense recorder to a personal budgeting and spending analytics tool.

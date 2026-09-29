@@ -244,7 +244,179 @@ Use a mix of:
 
 ---
 
-## 7. Acceptance checklist mapping
+## 7. Version 2 Test Cases
+
+### TC-V2-01: Create monthly budget
+
+- Test ID: TC-V2-01
+- Objective: Validate that a logged-in user can create a monthly budget.
+- Preconditions: User is authenticated and has no existing budget for the selected month.
+- Steps:
+  1. Open the budget section.
+  2. Select a month and enter a valid budget amount.
+  3. Save the budget.
+- Expected Result: Budget is saved successfully and appears in the dashboard summary.
+
+### TC-V2-02: Update monthly budget
+
+- Test ID: TC-V2-02
+- Objective: Validate that an existing budget amount can be updated without creating a duplicate row.
+- Preconditions: User has an existing budget for the selected month.
+- Steps:
+  1. Open the budget section.
+  2. Change the current budget amount to a new value.
+  3. Save the updated value.
+- Expected Result: The existing monthly record is updated, the month remains uniquely tracked, and the remaining budget recalculates correctly.
+
+### TC-V2-03: Replace budget entry when a new value is submitted for the same month
+
+- Test ID: TC-V2-03
+- Objective: Validate the system replaces the previous budget entry for the same user and month when a new value is submitted.
+- Preconditions: User has one previously saved budget record for a selected month.
+- Steps:
+  1. Submit a second budget value for the same month and year.
+  2. Save the new budget.
+- Expected Result: Only one budget record remains for that user and month, and it reflects the latest submitted value.
+
+### TC-V2-04: Budget utilization calculation
+
+- Test ID: TC-V2-04
+- Objective: Validate that utilization percentage is calculated correctly.
+- Preconditions: User has a valid monthly budget and recorded expenses.
+- Steps:
+  1. Add expenses for the month.
+  2. Review the budget card.
+- Expected Result: The system displays the correct utilization percentage based on monthly spend divided by the budget.
+
+### TC-V2-05: Remaining budget calculation
+
+- Test ID: TC-V2-05
+- Objective: Validate that remaining budget is computed accurately.
+- Preconditions: User has budget and actual spending entries for the same month.
+- Steps:
+  1. Add one or more expenses.
+  2. View the budget summary.
+- Expected Result: Remaining budget equals budget minus actual spend and displays a negative value if overspent.
+
+### TC-V2-06: Budget warning threshold
+
+- Test ID: TC-V2-06
+- Objective: Validate that warning state appears near the budget limit.
+- Preconditions: Budget amount is configured and spending is near the threshold.
+- Steps:
+  1. Add expenses that reach the warning threshold.
+  2. View the dashboard.
+- Expected Result: Warning alert is displayed when threshold conditions are met.
+
+### TC-V2-07: Budget exceeded scenario
+
+- Test ID: TC-V2-07
+- Objective: Validate that over-budget status is visible to the user.
+- Preconditions: Budget and expenses are set so total spend exceeds budget.
+- Steps:
+  1. Enter expenses beyond the configured budget.
+  2. View the dashboard summary.
+- Expected Result: Exceeded budget alert is displayed and remaining balance is negative.
+
+### TC-V2-08: Invalid budget values
+
+- Test ID: TC-V2-08
+- Objective: Validate that invalid budget inputs are rejected.
+- Preconditions: Budget form is open.
+- Steps:
+  1. Enter 0, negative numbers, or blank budget values.
+  2. Save the form.
+- Expected Result: Validation error is shown and no invalid budget is stored.
+
+### TC-V2-09: Month transition handling
+
+- Test ID: TC-V2-09
+- Objective: Validate that budget and analytics calculations reset correctly for a new month.
+- Preconditions: Budget is configured for the previous month and expenses exist in both months.
+- Steps:
+  1. Select a different month in the dashboard or analytics filter.
+  2. Compare totals.
+- Expected Result: Only the selected month is included in budget and category calculations.
+
+### TC-V2-10: Category aggregation
+
+- Test ID: TC-V2-10
+- Objective: Validate that expenses are aggregated correctly by category.
+- Preconditions: User has multiple expenses under different categories for the selected month.
+- Steps:
+  1. Open the category analytics section.
+  2. Select the month.
+- Expected Result: Each category shows the correct total spend for that month.
+
+### TC-V2-11: Category percentage calculation
+
+- Test ID: TC-V2-11
+- Objective: Validate that category contribution percentages are accurate.
+- Preconditions: User has multiple category totals for the month.
+- Steps:
+  1. View analytics summary.
+- Expected Result: Category percentage reflects the share of the selected month’s total spending.
+
+### TC-V2-12: Monthly filtering for analytics
+
+- Test ID: TC-V2-12
+- Objective: Validate analytics respect the selected month.
+- Preconditions: Expenses exist in more than one month.
+- Steps:
+  1. Select a month from the filter.
+  2. Review summary.
+- Expected Result: Only expenses for that month contribute to the metric and chart.
+
+### TC-V2-13: Empty dataset behavior
+
+- Test ID: TC-V2-13
+- Objective: Validate that no-data states are handled gracefully.
+- Preconditions: User has no expenses for the selected month.
+- Steps:
+  1. Open budget and analytics views.
+- Expected Result: Empty-state message is shown and no crash or incorrect values are displayed.
+
+### TC-V2-14: Multiple category validation
+
+- Test ID: TC-V2-14
+- Objective: Validate correct handling of multiple categories in a single month.
+- Preconditions: User has expenses across several categories.
+- Steps:
+  1. Review the analytics summary.
+- Expected Result: All categories are listed correctly and totals match actual records.
+
+### TC-V2-15: Analytics accuracy
+
+- Test ID: TC-V2-15
+- Objective: Validate that total and category values are identical to actual stored data.
+- Preconditions: User has a known set of expenses.
+- Steps:
+  1. Compute totals manually or compare against database records.
+  2. Review analytics output.
+- Expected Result: All category totals and percentages match the stored data accurately.
+
+### TC-V2-16: Visualization rendering
+
+- Test ID: TC-V2-16
+- Objective: Validate that budget and category charts render correctly.
+- Preconditions: User has valid budget and expense data.
+- Steps:
+  1. Open the dashboard or analytics page.
+- Expected Result: Summary bars or chart visuals display without breaking the layout.
+
+### TC-V2-17: Dashboard analytics display
+
+- Test ID: TC-V2-17
+- Objective: Validate that budget and analytics information are visible on the dashboard without interrupting expense operations.
+- Preconditions: User is logged in and has budget plus category data.
+- Steps:
+  1. Load the dashboard.
+  2. Review budget card and analytics section.
+- Expected Result: Dashboard displays status and analytics clearly while existing expense actions still function.
+
+---
+
+## 8. Acceptance checklist mapping
 
 The test plan directly covers the acceptance criteria in the specification:
 
