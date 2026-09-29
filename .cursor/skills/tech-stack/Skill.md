@@ -31,8 +31,20 @@ Use only the technologies approved for this project unless the project documenta
 - Prefer the simplest technology that satisfies the requirement.
 - Keep implementation beginner-friendly and consistent with project scope.
 - Do not introduce frameworks, libraries, or services that are not described in the approved project documents.
+- For the current Version 2 scope, the existing stack is sufficient for monthly budget tracking and category analytics.
 - If a technology choice would affect architecture, security, or scope, pause and confirm with the project requirements before proceeding.
 
-## 5. Quality Standard
+## 5. Version 2 Stack Review
+
+The current stack remains sufficient for the Version 2 release. Monthly budget tracking and category analytics can be implemented using the existing Flask backend, SQLite data layer, and HTML/CSS/JavaScript frontend without changing the project’s core technology decisions.
+
+Recommended approach:
+
+- Keep Flask for all server-side calculations and route logic.
+- Keep SQLite for budget persistence and analytics queries.
+- Use simple HTML/CSS/JavaScript for dashboard panels, budget status, and category summaries.
+- Avoid introducing a chart library unless it is explicitly required later.
+
+## 6. Quality Standard
 
 The technology selection should support a maintainable, secure, and straightforward expense tracking application without unnecessary complexity.

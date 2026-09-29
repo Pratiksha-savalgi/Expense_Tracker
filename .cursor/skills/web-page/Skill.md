@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-Build the frontend pages for the Expense Tracker using simple, maintainable HTML, CSS, and JavaScript, rendered through Flask templates. The goal is to create a clean, form-driven interface for users to register, sign in, manage their expenses, and navigate the application without adding unnecessary complexity.
+Build the frontend pages for the Expense Tracker using simple, maintainable HTML, CSS, and JavaScript, rendered through Flask templates. The goal is to create a clean, form-driven interface for users to register, sign in, manage their expenses, set a monthly budget, and review category analytics without adding unnecessary complexity.
 
 This work should follow the project architecture and the visual design documented in:
 
@@ -21,7 +21,7 @@ Use only the approved frontend stack for the project:
 - JavaScript
 - Flask Templates
 
-Do not introduce additional frameworks or libraries unless explicitly approved by the project requirements.
+Do not introduce additional frameworks or libraries unless explicitly approved by the project requirements. The current stack remains sufficient for the Version 2 scope.
 
 ## 3. Pages to Build
 
@@ -40,7 +40,7 @@ Create pages that match the Expense Tracker flow and UI structure:
 ### Dashboard
 - Show the authenticated user’s main expense management area.
 - Include navigation to add, edit, view, and delete expense actions.
-- Display summary information such as total spending where appropriate.
+- Display summary information such as total spending, monthly budget status, and category totals where appropriate.
 
 ### Add Expense
 - Create a simple form for amount, category, date, and description.
@@ -52,6 +52,16 @@ Create pages that match the Expense Tracker flow and UI structure:
 - Allow the user to update the same fields.
 - Submit the update to the backend and confirm the result.
 
+### Monthly Budget Panel
+- Let the logged-in user choose a month and enter a budget amount.
+- Show the remaining amount and usage percentage when the budget is configured.
+- Display warning or exceeded states using simple status text or color cues.
+
+### Category Analytics View
+- Show category totals for the selected month.
+- Render a simple summary list or table for the current user.
+- Handle empty-state scenarios clearly when no category totals exist.
+
 ## 4. UI Guidelines
 
 Keep the layout simple and consistent with the repository’s visual design.
@@ -62,6 +72,7 @@ Keep the layout simple and consistent with the repository’s visual design.
 - Maintain spacing, alignment, and readable typography.
 - Keep the interface focused on core expense-tracking actions.
 - Match the visual intent from the design visuals in the project.
+- Use simple status styles for budget warnings and over-budget alerts.
 
 ## 5. Form Rules
 
@@ -79,6 +90,7 @@ The page flow should be straightforward:
 
 - Login → Dashboard
 - Dashboard → Add Expense / Edit Expense / View Records
+- Dashboard → Monthly Budget / Analytics
 - Dashboard → Logout support
 - Each page should provide clear navigation or return paths.
 - Ensure authenticated users can access expense functionality and unauthenticated users are redirected appropriately.
@@ -88,7 +100,7 @@ The page flow should be straightforward:
 The frontend must integrate with the Flask application using standard route-based behavior:
 
 - Render templates using Flask routes.
-- Submit forms to backend routes for login, registration, add, edit, and delete actions.
+- Submit forms to backend routes for login, registration, add, edit, delete, budget, and analytics actions.
 - Display server-side messages, form errors, and validation feedback.
 - Use data returned by Flask to render dynamic lists, summaries, and form values.
 - Keep the browser layer focused on presentation and user interaction, while the backend enforces logic.
@@ -97,7 +109,8 @@ The frontend must integrate with the Flask application using standard route-base
 
 The deliverable should include:
 
-- HTML templates for login, register, dashboard, add expense, and edit expense views
+- HTML templates for login, register, dashboard, add expense, edit expense, and analytics views
+- Budget entry controls and summary panels in the dashboard or settings area
 - CSS files for the shared styling and layout
 - JavaScript files only if lightweight client-side behavior is needed
 - Simple, reusable structure suitable for the Expense Tracker project
