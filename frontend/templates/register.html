@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Create account{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+{% block content %}
+<section class="auth-layout">
+  <div class="auth-aside">
+    <p class="eyebrow">Start with a clear picture</p>
+    <h1>Small notes.<br><em>Better</em> insight.</h1>
+    <p class="aside-copy">Keep your daily expenses organized, private, and easy to review.</p>
+    <div class="aside-rule" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+  </div>
+  <div class="auth-panel">
+    <p class="eyebrow">Your account</p>
+    <h2>Create an account</h2>
+    <p class="form-intro">Your expenses stay private to your account.</p>
+    <form method="post" class="form-stack" data-password-confirm>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" autocomplete="username" required value="{{ username }}" placeholder="Choose a username">
+      <label for="password">Password</label>
+      <span class="password-field">
+        <input id="password" name="password" type="password" autocomplete="new-password" required>
+        <button class="password-toggle" type="button" data-password-toggle="password" aria-label="Show password" aria-pressed="false" title="Show password">
+          <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+          <svg class="eye-closed" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8"></path><path d="M9.9 5.2A11 11 0 0 1 12 5c5.2 0 9.3 4.5 10 7-.3 1.1-1.4 2.9-3.1 4.4M6.6 6.6C4.1 8 2.4 10.5 2 12c.7 2.5 4.8 7 10 7 1.1 0 2.1-.2 3.1-.6"></path></svg>
+        </button>
+      </span>
+      <label for="confirm_password">Confirm password</label>
+      <span class="password-field">
+        <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required>
+        <button class="password-toggle" type="button" data-password-toggle="confirm_password" aria-label="Show password" aria-pressed="false" title="Show password">
+          <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+          <svg class="eye-closed" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8"></path><path d="M9.9 5.2A11 11 0 0 1 12 5c5.2 0 9.3 4.5 10 7-.3 1.1-1.4 2.9-3.1 4.4M6.6 6.6C4.1 8 2.4 10.5 2 12c.7 2.5 4.8 7 10 7 1.1 0 2.1-.2 3.1-.6"></path></svg>
+        </button>
+      </span>
+      <button class="button button-primary button-full" type="submit">Create account <span aria-hidden="true">→</span></button>
+    </form>
+    <p class="auth-switch">Already registered? <a href="{{ url_for('login') }}">Sign in</a></p>
+  </div>
+</section>
+{% endblock %}

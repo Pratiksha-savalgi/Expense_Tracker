@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Your expenses{% endblock %}
+{% block content %}
+<section class="dashboard-heading">
+  <div>
+    <p class="eyebrow">Your records</p>
+    <h1>Expenses <span class="heading-period">.</span></h1>
+    <p class="page-lede">A clear view of what you have spent.</p>
+  </div>
+  <a class="button button-primary" href="{{ url_for('add_expense') }}"><span class="plus-mark" aria-hidden="true">+</span> Add expense</a>
+</section>
+
+<section class="overview-row" aria-label="Expense summary and filters">
+  <div class="total-block">
+    <span class="summary-label">Total shown</span>
+    <strong>{{ format_money(total) }}</strong>
+    <span class="summary-note">{{ expenses|length }} {% if expenses|length == 1 %}record{% else %}records{% endif %}{% if category_filter or date_filter %} matching filters{% endif %}</span>
+  </div>
+  <form class="filter-form" method="get" action="{{ url_for('dashboard') }}">
+    <div class="filter-field">
+      <label for="category-filter">Category</label>
+      <select id="category-filter" name="category">
+        <option value="">All categories</option>
+        {% for category in categories %}
+        <option value="{{ category }}" {% if category == category_filter %}selected{% endif %}>{{ category }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-field">
+      <label for="date-filter">Date</label>
+      <input id="date-filter" name="date" type="date" value="{{ date_filter }}">
+    </div>
+    <button class="button button-outline" type="submit">Apply filters</button>
+    {% if category_filter or date_filter %}<a class="clear-filter" href="{{ url_for('dashboard') }}">Clear</a>{% endif %}
+  </form>
+</section>
+
+<section class="records-section" aria-labelledby="records-title">
+  <div class="records-heading">
+    <div>
+      <p class="eyebrow">Ledger</p>
+      <h2 id="records-title">Expense list</h2>
+    </div>
+    <span class="records-date">Newest first</span>
+  </div>
+  {% if expenses %}
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th scope="col">Amount</th><th scope="col">Category</th><th scope="col">Date</th><th scope="col">Description</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+      <tbody>
+        {% for expense in expenses %}
+        <tr>
+          <td class="amount-cell">{{ format_money(expense.amount) }}</td>
+          <td><span class="category-label">{{ expense.category }}</span></td>
+          <td class="date-cell">{{ expense.expense_date }}</td>
+          <td class="description-cell">{{ expense.description or '—' }}</td>
+          <td class="action-cell">
+            <a class="text-action" href="{{ url_for('edit_expense', expense_id=expense.id) }}">Edit</a>
+            <form action="{{ url_for('delete_expense', expense_id=expense.id) }}" method="post" data-confirm="Delete this expense? This cannot be undone.">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="text-action text-action-danger" type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <span class="empty-mark" aria-hidden="true">+</span>
+    {% if category_filter or date_filter %}
+    <h3>No matching expenses</h3>
+    <p>Try changing your filters or clear them to see every record.</p>
+    <a class="button button-outline" href="{{ url_for('dashboard') }}">Clear filters</a>
+    {% else %}
+    <h3>Your ledger starts here</h3>
+    <p>Add an expense and it will appear here for you to review.</p>
+    <a class="button button-primary" href="{{ url_for('add_expense') }}">Add your first expense <span aria-hidden="true">→</span></a>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}
