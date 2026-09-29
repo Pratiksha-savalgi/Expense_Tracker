@@ -36,6 +36,38 @@ The implementation must stay aligned with the repository’s approved project do
 
 If these documents conflict, follow the project requirements and design intent first, then the technical stack and delivery plan.
 
+## Layered guidance model
+
+This repository uses a three-layer operating model for agents and contributors:
+
+1. Project goal and operating rules: this file defines the overall mission, allowed scope, source-of-truth documents, and required behavior for any work.
+2. Reference documents: the repository design and requirement documents define what the product should do and how it should be implemented.
+3. Task-specific skills: skill files define the exact execution patterns for specialized work such as authentication, data persistence, web pages, or project layout.
+
+This separation is intentional. High-level policy belongs in AGENTS.md, implementation guidance belongs in task-specific skills, and product and technical requirements belong in the reference documents.
+
+## Required SDLC workflow
+
+Perform every task in the repository according to the following lifecycle sequence and always reference the relevant approved documents before implementation decisions are made:
+
+1. Requirements and analysis
+   - Read [requirements.md](requirements.md) and [spec.md](spec.md) first.
+   - Confirm the exact functional and non-functional requirements for the task.
+   - If the requirement is ambiguous, stop and ask the developer for clarification before proceeding.
+
+2. Design and architecture
+   - Use [design.md](design.md), [design-visuals.md](design-visuals.md), and [tech-stack.md](tech-stack.md) to understand the architecture, data model, and approved stack.
+   - Ensure any design decision is consistent with the approved project structure and scope.
+
+3. Implementation
+   - Apply the relevant task-specific skill file in [.cursor/skills](../.cursor/skills) for the required work.
+   - Example: use the authentication skill for login logic, the database skill for persistence design, and the web-page skill for page creation.
+   - Keep the implementation minimal, readable, and aligned with the repository design.
+
+4. Verification and acceptance
+   - Verify the result against the acceptance criteria and project requirements before considering the work complete.
+   - Confirm behavior matches the documented user flows, data rules, and security constraints.
+
 ## Functional requirements summary
 
 The Expense Tracker must support:
@@ -100,8 +132,11 @@ The implementation must enforce the requirements already documented by the proje
 - Keep the solution aligned with the project’s purpose, architecture, and design.
 - Prefer simple, readable implementations over broader or more complex alternatives.
 - If requirements are unclear, ambiguous, or open to interpretation, stop and ask the developers for clarification before making a decision.
-- Never make independent assumptions to resolve ambiguities in business behavior, validation rules, or architecture.
 - If requirements are unclear, pause and seek explicit approval before proceeding.
+- Before making implementation decisions, consult the relevant requirement and design documents for the task.
+- Use the relevant project-specific skill files to follow the approved execution pattern for that task.
+- Keep any task-specific solution scoped to the repository’s approved architecture and feature set.
+- Consult the developer whenever clarification is needed; do not silently choose a behavior that changes project scope or security expectations.
 
 ## Verification
 

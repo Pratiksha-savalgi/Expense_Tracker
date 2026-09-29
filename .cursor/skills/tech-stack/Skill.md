@@ -1,0 +1,38 @@
+# Technology Stack Selection
+
+## 1. Purpose
+
+Enables the choice of required technology stack elements to implement the project.
+
+This skill defines the approved technologies for the Expense Tracker and ensures that implementation decisions stay aligned with the project’s requirements, design, and intended architecture.
+
+This work must stay aligned with:
+
+- [docs/AGENTS.md](../../docs/AGENTS.md)
+- [docs/requirements.md](../../docs/requirements.md)
+- [docs/spec.md](../../docs/spec.md)
+- [docs/design.md](../../docs/design.md)
+- [docs/tech-stack.md](../../docs/tech-stack.md)
+
+## 2. Core Rule
+
+Use only the technologies approved for this project unless the project documentation explicitly authorizes a change.
+
+## 3. Approved Stack
+
+- HTML for page structure and forms
+- CSS for styling and layout
+- JavaScript for lightweight client-side interactions
+- Flask for server-side routes, business logic, and session handling
+- SQLite for data persistence and user/expense storage
+
+## 4. Decision Guidance
+
+- Prefer the simplest technology that satisfies the requirement.
+- Keep implementation beginner-friendly and consistent with project scope.
+- Do not introduce frameworks, libraries, or services that are not described in the approved project documents.
+- If a technology choice would affect architecture, security, or scope, pause and confirm with the project requirements before proceeding.
+
+## 5. Quality Standard
+
+The technology selection should support a maintainable, secure, and straightforward expense tracking application without unnecessary complexity.
