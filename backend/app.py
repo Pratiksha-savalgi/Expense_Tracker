@@ -156,6 +156,67 @@ def get_category_analytics(user_id, target_month):
     }
 
 
+def get_budget_summary(user_id, month=None, year=None):
+    selected_month = int(month) if month is not None else date.today().month
+    selected_year = int(year) if year is not None else date.today().year
+
+    with database_connection() as connection:
+        budget = connection.execute(
+            "SELECT id, budget_amount FROM budgets WHERE user_id = ? AND month = ? AND year = ?",
+            (user_id, selected_month, selected_year),
+        ).fetchone()
+        total_spent_row = connection.execute(
+            "SELECT COALESCE(SUM(CAST(amount AS REAL)), 0) AS total_spent FROM expenses "
+            "WHERE user_id = ? AND CAST(strftime('%Y', expense_date) AS INTEGER) = ? "
+            "AND CAST(strftime('%m', expense_date) AS INTEGER) = ?",
+            (user_id, selected_year, selected_month),
+        ).fetchone()
+
+    spent = Decimal(str(total_spent_row["total_spent"])) if total_spent_row and total_spent_row["total_spent"] is not None else Decimal("0")
+    budget_amount = Decimal(str(budget["budget_amount"])) if budget else None
+
+    if budget_amount is None:
+        return {
+            "month": selected_month,
+            "year": selected_year,
+            "budget_amount": None,
+            "total_spent": spent,
+            "remaining": None,
+            "utilization": Decimal("0"),
+            "status": "not_set",
+            "status_label": "No budget set",
+            "message": "Set a monthly budget to track your spending.",
+        }
+
+    remaining = budget_amount - spent
+    utilization = (spent / budget_amount * Decimal("100")) if budget_amount else Decimal("0")
+
+    if spent > budget_amount:
+        status = "exceeded"
+        status_label = "Budget exceeded"
+        message = "You have spent more than your monthly budget."
+    elif utilization >= Decimal("80"):
+        status = "warning"
+        status_label = "Warning"
+        message = "You are close to your monthly budget limit."
+    else:
+        status = "healthy"
+        status_label = "On track"
+        message = "You are within your monthly budget."
+
+    return {
+        "month": selected_month,
+        "year": selected_year,
+        "budget_amount": budget_amount,
+        "total_spent": spent,
+        "remaining": remaining,
+        "utilization": utilization,
+        "status": status,
+        "status_label": status_label,
+        "message": message,
+    }
+
+
 @app.get("/")
 def home():
     if "user_id" in session:
@@ -237,7 +298,6 @@ def logout():
 def dashboard():
     category_filter = request.args.get("category", "").strip()
     date_filter = request.args.get("date", "").strip()
-    analytics_month = request.args.get("analytics_month", date.today().strftime("%Y-%m")).strip()
     if date_filter:
         try:
             parsed_date = date.fromisoformat(date_filter)
@@ -278,7 +338,6 @@ def dashboard():
         ).fetchall()
 
     total = sum((Decimal(expense["amount"]) for expense in expenses), Decimal("0"))
-    analytics = get_category_analytics(session["user_id"], analytics_month)
     return render_template(
         "view_expenses.html",
         expenses=expenses,
@@ -286,11 +345,6 @@ def dashboard():
         category_filter=category_filter,
         date_filter=date_filter,
         total=total,
-        analytics_month=analytics["month"],
-        analytics_items=analytics["items"],
-        analytics_total=analytics["total"],
-        highest_category=analytics["highest_category"],
-        lowest_category=analytics["lowest_category"],
     )
 
 
