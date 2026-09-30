@@ -43,13 +43,16 @@ Create pages that match the Expense Tracker flow and UI structure:
 - Display summary information such as total spending, monthly budget status, and category totals where appropriate.
 
 ### Add Expense
-- Create a simple form for amount, category, date, and description.
+- Create a simple form for amount, main category, optional subcategory, date, Liability/Savings type, and optional description.
+- Show built-in categories and their subcategory suggestions in dependent dropdowns.
+- Provide **Add category** and **Add subcategory** choices for custom values.
+- For an existing category, provide an action to save a new subcategory immediately and add it to the current dropdown; a subcategory for a new category is saved with the expense.
 - Submit the form to a Flask route that validates and saves the record.
 - Show success or error feedback to the user.
 
 ### Edit Expense
 - Render a pre-filled form for an existing expense record.
-- Allow the user to update the same fields.
+- Allow the user to update the same fields, including category, subcategory, and Liability/Savings type.
 - Submit the update to the backend and confirm the result.
 
 ### Monthly Budget Panel
@@ -79,6 +82,8 @@ Keep the layout simple and consistent with the repository’s visual design.
 Follow consistent form behavior across the frontend:
 
 - Mark all required fields clearly.
+- Set numeric amount controls to positive values in 0.01 increments and provide clear validation feedback.
+- Preserve selected categories, subcategories, expense type, and entered values when server-side validation fails.
 - Use basic client-side validation for common issues like empty fields or invalid date formats.
 - Show clear error messages to the user.
 - Keep validation simple and helpful, without replacing backend validation.

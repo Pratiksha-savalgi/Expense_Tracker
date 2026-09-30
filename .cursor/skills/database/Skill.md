@@ -16,7 +16,7 @@ This work must stay aligned with:
 
 - Use SQLite as the approved database technology.
 - Keep the schema simple and aligned with the project scope.
-- Store users, expenses, and monthly budgets in clear, separate data sets.
+- Store users, expenses, categories, subcategories, and monthly budgets in clear, separate data sets.
 - Enforce user-specific access boundaries.
 - Support category-based reporting and monthly totals without adding unnecessary complexity.
 
@@ -29,9 +29,17 @@ This work must stay aligned with:
 
 ### Expenses
 - Store the per-user expense entries.
-- Include fields required by the project: amount, category, date, and description.
+- Include amount, category reference and display value, optional subcategory reference, Liability/Savings type, date, and description.
 - Associate each expense with the correct user record.
 - Keep the primary data model simple and consistent with the project design.
+
+### Categories and subcategories
+- Store categories per user with a normalized comparison key and a stable display name.
+- Store subcategories under a parent category with a normalized comparison key.
+- Enforce uniqueness by user/category and normalized name.
+- Seed the approved built-in categories and subcategories idempotently per user without replacing custom entries.
+- Normalize names by trimming/collapsing whitespace and case-folding comparisons.
+- Migrate existing free-text expense categories to per-user category rows without losing expense records; default legacy expense type to Liability and leave subcategory unset.
 
 ### Budgets
 - Store monthly budget records by user and month.
@@ -43,6 +51,8 @@ This work must stay aligned with:
 - Every expense must belong to an authenticated user.
 - Users may only operate on their own records.
 - Reject invalid or incomplete records before saving.
+- Require positive expense amounts with at most two decimal places.
+- Validate that category belongs to the signed-in user and subcategory belongs to the selected category.
 - Use consistent validation rules for category, date, amount, and budget values.
 - Maintain normal SQLite behavior for reliable record updates and deletions.
 - For duplicate monthly budgets, update the existing row instead of creating overlapping records.
@@ -54,6 +64,7 @@ This work must stay aligned with:
 - Calculate totals from the logged-in user’s records only.
 - Aggregate monthly totals for the selected month and user.
 - Aggregate category totals for category-wise analytics.
+- Persist a new subcategory for an existing category immediately so it is available on later forms.
 - Keep SQL simple, explicit, and readable.
 
 ## 6. Version 2 Database Guidance

@@ -44,6 +44,7 @@ This work must stay aligned with:
 - Require the user to be logged in before accessing expense operations.
 - Ensure a logged-in user can only access their own records.
 - Prevent cross-user viewing, editing, or deletion of expense entries.
+- Scope category creation and subcategory writes to the authenticated user; verify the parent category belongs to that user.
 - Require authentication before the user can manage monthly budget information or category analytics.
 
 ## 4. Implementation Guidance
@@ -54,6 +55,7 @@ This work must stay aligned with:
 - Reuse project patterns for redirecting users to the login flow when required.
 - Avoid adding admin or multi-user roles beyond the approved scope.
 - Protect all Version 2 budget and analytics views behind the same session rules as expense management.
+- Protect the JSON subcategory-save endpoint with authentication and CSRF validation.
 
 ## 5. Output Expectations
 

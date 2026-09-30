@@ -32,6 +32,7 @@ The implementation must stay aligned with the repository’s approved project do
 - [design.md](design.md) — architecture, system context, data model, and functional design
 - [tech-stack.md](tech-stack.md) — approved technologies and responsibilities
 - [plan.md](plan.md) — implementation scope and sequencing
+- [../expense-tracker-team-requirements.md](../expense-tracker-team-requirements.md) — approved two-module requirements and ownership boundaries
 - [design-visuals.md](design-visuals.md) and [visuals](visuals) — GUI and architecture visuals
 
 If these documents conflict, follow the project requirements and design intent first, then the technical stack and delivery plan.
@@ -76,7 +77,8 @@ The Expense Tracker must support:
 - user login and logout
 - secure session-based access
 - add, view, edit, and delete expenses
-- category assignment for expenses
+- category and subcategory assignment for expenses, including common defaults and user-defined values
+- Liability/Savings classification and two-decimal amount validation
 - filtering by category and date
 - display of total spending
 - strict per-user data isolation
@@ -100,7 +102,7 @@ Keep the implementation focused on the approved personal expense tracker scope. 
 - keyword search beyond the approved scope
 - admin functions for multiple users
 - analytics dashboards or external frameworks
-- extra fields or features not described in the project documents
+- extra fields or features not described in the project documents; Module A explicitly approves subcategory and expense type
 
 ## Architecture and design requirements
 
@@ -118,8 +120,10 @@ The design should stay beginner-friendly and aligned with the approved system ar
 
 The implementation must enforce the requirements already documented by the project:
 
-- expenses require valid amount, category, and date values
-- amount must be greater than zero
+- expenses require a positive amount with at most two decimal places, category, valid date, and Liability/Savings type
+- optional subcategories must belong to the selected user-owned category
+- category and subcategory names are normalized for case and whitespace
+- custom subcategories under existing categories are persisted immediately
 - an expense must belong to a registered user
 - user must log in before managing expenses
 - passwords must not be stored in plain text

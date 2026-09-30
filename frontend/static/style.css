@@ -170,6 +170,7 @@ input, select, textarea {
   outline: none;
   background: #fff;
 }
+input[type="radio"] { width: 18px; min-height: 18px; margin: 0 7px 0 0; accent-color: var(--green); }
 input:focus, select:focus, textarea:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgb(40 98 71 / 12%); }
 input::placeholder, textarea::placeholder { color: #929c94; }
 textarea { min-height: 92px; resize: vertical; }
@@ -297,6 +298,12 @@ th:last-child, td:last-child { padding-right: 25px; }
 .amount-input { position: relative; }
 .amount-input > span { position: absolute; top: 10px; left: 12px; z-index: 1; color: var(--muted); }
 .amount-input input { padding-left: 31px; }
+.type-field { padding: 0; border: 0; }
+.type-field legend { margin-bottom: 6px; color: #34463b; font-size: 12px; font-weight: 700; }
+.type-field label { min-height: 42px; padding: 9px 12px; display: inline-flex; align-items: center; margin: 0 8px 0 0; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+.type-field label:has(input:checked) { border-color: var(--green); background: var(--green-soft); }
+.expense-meta { margin-top: 6px; color: var(--muted); font-size: 11px; }
+.entry-form [hidden] { display: none !important; }
 .form-actions { margin-top: 24px; padding-top: 19px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e8ece7; }
 .visually-hidden { width: 1px; height: 1px; padding: 0; position: absolute; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); border: 0; }
 

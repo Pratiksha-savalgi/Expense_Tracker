@@ -3,14 +3,20 @@ from decimal import Decimal, InvalidOperation
 from functools import wraps
 import hmac
 import os
+import re
 import secrets
 import sqlite3
 from pathlib import Path
 
-from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
+from flask import Flask, abort, flash, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from database.database import database_connection, initialize_database
+from database.database import (
+    database_connection,
+    initialize_database,
+    normalize_category_name,
+    seed_default_categories,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 app = Flask(
@@ -51,6 +57,8 @@ def template_helpers():
 def protect_form_submissions():
     if request.method == "POST":
         submitted_token = request.form.get("csrf_token", "")
+        if not submitted_token and request.is_json:
+            submitted_token = request.headers.get("X-CSRF-Token", "")
         saved_token = session.get("csrf_token", "")
         if not saved_token or not hmac.compare_digest(submitted_token, saved_token):
             abort(400)
@@ -59,31 +67,155 @@ def protect_form_submissions():
 def login_required(view):
     @wraps(view)
     def wrapped_view(**kwargs):
-        if "user_id" not in session:
+        user_id = session.get("user_id")
+        if user_id is None:
             flash("Sign in to access your expenses.", "error")
+            return redirect(url_for("login"))
+        with database_connection() as connection:
+            user = connection.execute(
+                "SELECT id FROM users WHERE id = ?",
+                (user_id,),
+            ).fetchone()
+        if user is None:
+            session.clear()
+            flash("Your session is no longer valid. Please sign in again.", "error")
             return redirect(url_for("login"))
         return view(**kwargs)
 
     return wrapped_view
 
 
-def parse_expense_form(form):
+def get_user_categories(user_id):
+    seed_default_categories(user_id)
+    with database_connection() as connection:
+        rows = connection.execute(
+            "SELECT c.id AS category_id, c.name AS category_name, "
+            "s.id AS subcategory_id, s.name AS subcategory_name "
+            "FROM categories c LEFT JOIN subcategories s ON s.category_id = c.id "
+            "WHERE c.user_id = ? ORDER BY c.name COLLATE NOCASE, s.name COLLATE NOCASE",
+            (user_id,),
+        ).fetchall()
+
+    categories_by_id = {}
+    for row in rows:
+        category = categories_by_id.setdefault(
+            row["category_id"],
+            {"id": row["category_id"], "name": row["category_name"], "subcategories": []},
+        )
+        if row["subcategory_id"] is not None:
+            category["subcategories"].append(
+                {"id": row["subcategory_id"], "name": row["subcategory_name"]}
+            )
+    return list(categories_by_id.values())
+
+
+def parse_expense_form(form, user_id):
     amount_text = form.get("amount", "").strip()
-    category = form.get("category", "").strip()
+    category_choice = form.get("category_id", "").strip()
+    new_category = normalize_category_name(form.get("new_category", ""))
+    if not category_choice and form.get("category", "").strip():
+        category_choice = "__new__"
+        new_category = normalize_category_name(form.get("category", ""))
+    subcategory_choice = form.get("subcategory_id", "").strip()
+    new_subcategory = normalize_category_name(form.get("new_subcategory", ""))
     expense_date = form.get("expense_date", "").strip()
     description = form.get("description", "").strip()
+    expense_type = form.get("expense_type", "Liability").strip().casefold()
     errors = []
 
-    try:
-        amount = Decimal(amount_text)
-        if not amount.is_finite() or amount <= 0:
-            errors.append("Amount must be greater than zero.")
-    except InvalidOperation:
-        amount = None
-        errors.append("Enter a valid amount greater than zero.")
+    amount = None
+    if not amount_text:
+        errors.append("Enter an amount.")
+    else:
+        try:
+            amount = Decimal(amount_text)
+            if not amount.is_finite():
+                errors.append("Enter a valid amount.")
+            elif amount <= 0:
+                errors.append("Amount must be greater than zero.")
+            elif not re.fullmatch(r"(?:\d+(?:\.\d{0,2})?|\.\d{1,2})", amount_text):
+                errors.append("Amount must use no more than two decimal places.")
+        except InvalidOperation:
+            errors.append("Enter a valid amount, such as 32.12.")
 
-    if not category:
-        errors.append("Enter a category.")
+    category_id = None
+    category_name = ""
+    if category_choice == "__new__":
+        if not new_category:
+            errors.append("Enter a name for the new category.")
+        else:
+            normalized_name = new_category.casefold()
+            with database_connection() as connection:
+                category = connection.execute(
+                    "SELECT id, name FROM categories WHERE user_id = ? AND normalized_name = ?",
+                    (user_id, normalized_name),
+                ).fetchone()
+            if category is not None:
+                category_id = str(category["id"])
+                category_name = category["name"]
+                new_category = ""
+            else:
+                category_name = new_category
+    else:
+        try:
+            selected_category_id = int(category_choice)
+        except ValueError:
+            selected_category_id = None
+        if selected_category_id is None:
+            errors.append("Choose a category or add a new one.")
+        else:
+            with database_connection() as connection:
+                category = connection.execute(
+                    "SELECT id, name FROM categories WHERE id = ? AND user_id = ?",
+                    (selected_category_id, user_id),
+                ).fetchone()
+            if category is None:
+                errors.append("Choose a valid category.")
+            else:
+                category_id = str(category["id"])
+                category_name = category["name"]
+
+    subcategory_id = None
+    subcategory_name = ""
+    if subcategory_choice == "__new__":
+        if not new_subcategory:
+            errors.append("Enter a name for the new subcategory.")
+        else:
+            subcategory_name = new_subcategory
+            if category_id is not None:
+                with database_connection() as connection:
+                    subcategory = connection.execute(
+                        "SELECT id, name FROM subcategories "
+                        "WHERE category_id = ? AND normalized_name = ?",
+                        (int(category_id), new_subcategory.casefold()),
+                    ).fetchone()
+                if subcategory is not None:
+                    subcategory_id = str(subcategory["id"])
+                    subcategory_name = subcategory["name"]
+                    new_subcategory = ""
+    elif subcategory_choice:
+        try:
+            selected_subcategory_id = int(subcategory_choice)
+        except ValueError:
+            selected_subcategory_id = None
+        if selected_subcategory_id is None or category_id is None:
+            errors.append("Choose a subcategory belonging to the selected category.")
+        else:
+            with database_connection() as connection:
+                subcategory = connection.execute(
+                    "SELECT id, name FROM subcategories WHERE id = ? AND category_id = ?",
+                    (selected_subcategory_id, int(category_id)),
+                ).fetchone()
+            if subcategory is None:
+                errors.append("Choose a subcategory belonging to the selected category.")
+            else:
+                subcategory_id = str(subcategory["id"])
+                subcategory_name = subcategory["name"]
+
+    if expense_type not in {"liability", "savings"}:
+        errors.append("Choose whether this entry is a liability or savings.")
+    else:
+        expense_type = expense_type.title()
 
     try:
         parsed_date = date.fromisoformat(expense_date)
@@ -94,10 +226,108 @@ def parse_expense_form(form):
 
     return {
         "amount": format(amount, "f") if amount is not None else amount_text,
-        "category": category,
+        "category_id": category_id or category_choice,
+        "category_name": category_name,
+        "new_category": new_category,
+        "subcategory_id": subcategory_id or subcategory_choice,
+        "subcategory_name": subcategory_name,
+        "new_subcategory": new_subcategory,
+        "expense_type": expense_type or "Liability",
         "expense_date": expense_date,
         "description": description,
     }, errors
+
+
+def get_or_create_category(connection, user_id, category_name):
+    category_name = normalize_category_name(category_name)
+    normalized_name = category_name.casefold()
+    connection.execute(
+        "INSERT INTO categories (user_id, name, normalized_name) VALUES (?, ?, ?) "
+        "ON CONFLICT(user_id, normalized_name) DO NOTHING",
+        (user_id, category_name, normalized_name),
+    )
+    return connection.execute(
+        "SELECT id, name FROM categories WHERE user_id = ? AND normalized_name = ?",
+        (user_id, normalized_name),
+    ).fetchone()
+
+
+def get_or_create_subcategory(connection, category_id, subcategory_name):
+    subcategory_name = normalize_category_name(subcategory_name)
+    normalized_name = subcategory_name.casefold()
+    connection.execute(
+        "INSERT INTO subcategories (category_id, name, normalized_name) VALUES (?, ?, ?) "
+        "ON CONFLICT(category_id, normalized_name) DO NOTHING",
+        (category_id, subcategory_name, normalized_name),
+    )
+    return connection.execute(
+        "SELECT id, name FROM subcategories WHERE category_id = ? AND normalized_name = ?",
+        (category_id, normalized_name),
+    ).fetchone()
+
+
+def save_expense(connection, user_id, values, expense_id=None):
+    category = (
+        connection.execute(
+            "SELECT id, name FROM categories WHERE id = ? AND user_id = ?",
+            (int(values["category_id"]), user_id),
+        ).fetchone()
+        if values["category_id"] and values["category_id"] != "__new__"
+        else get_or_create_category(connection, user_id, values["category_name"])
+    )
+    if category is None:
+        raise ValueError("Choose a valid category.")
+
+    if values["subcategory_id"] == "__new__" and values["new_subcategory"]:
+        subcategory = get_or_create_subcategory(connection, category["id"], values["new_subcategory"])
+        subcategory_id = subcategory["id"]
+        subcategory_name = subcategory["name"]
+    elif values["subcategory_id"]:
+        subcategory = connection.execute(
+            "SELECT id, name FROM subcategories WHERE id = ? AND category_id = ?",
+            (int(values["subcategory_id"]), category["id"]),
+        ).fetchone()
+        if subcategory is None:
+            raise ValueError("Choose a subcategory belonging to the selected category.")
+        subcategory_id = subcategory["id"]
+        subcategory_name = subcategory["name"]
+    else:
+        subcategory_id = None
+        subcategory_name = ""
+
+    if expense_id is None:
+        connection.execute(
+            "INSERT INTO expenses "
+            "(user_id, amount, category, expense_date, description, category_id, subcategory_id, expense_type) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                user_id,
+                values["amount"],
+                category["name"],
+                values["expense_date"],
+                values["description"],
+                category["id"],
+                subcategory_id,
+                values["expense_type"],
+            ),
+        )
+    else:
+        connection.execute(
+            "UPDATE expenses SET amount = ?, category = ?, expense_date = ?, description = ?, "
+            "category_id = ?, subcategory_id = ?, expense_type = ? "
+            "WHERE id = ? AND user_id = ?",
+            (
+                values["amount"],
+                category["name"],
+                values["expense_date"],
+                values["description"],
+                category["id"],
+                subcategory_id,
+                values["expense_type"],
+                expense_id,
+                user_id,
+            ),
+        )
 
 
 def get_category_analytics(user_id, target_month):
@@ -328,25 +558,29 @@ def dashboard():
         selected_month = date.today().month
         selected_year = date.today().year
 
-    conditions = ["user_id = ?"]
+    categories = get_user_categories(session["user_id"])
+    valid_category_ids = {str(category["id"]) for category in categories}
+    if category_filter and category_filter not in valid_category_ids:
+        flash("Choose a valid category filter.", "error")
+        category_filter = ""
+
+    conditions = ["e.user_id = ?"]
     values = [session["user_id"]]
     if category_filter:
-        conditions.append("category = ?")
+        conditions.append("e.category_id = ?")
         values.append(category_filter)
     if date_filter:
-        conditions.append("expense_date = ?")
+        conditions.append("e.expense_date = ?")
         values.append(date_filter)
 
     with database_connection() as connection:
         expenses = connection.execute(
-            "SELECT id, amount, category, expense_date, description "
-            f"FROM expenses WHERE {' AND '.join(conditions)} "
-            "ORDER BY expense_date DESC, id DESC",
+            "SELECT e.id, e.amount, e.category, e.category_id, e.subcategory_id, "
+            "COALESCE(s.name, '') AS subcategory, e.expense_date, e.description, e.expense_type "
+            "FROM expenses e LEFT JOIN subcategories s ON s.id = e.subcategory_id "
+            f"WHERE {' AND '.join(conditions)} "
+            "ORDER BY e.expense_date DESC, e.id DESC",
             values,
-        ).fetchall()
-        categories = connection.execute(
-            "SELECT DISTINCT category FROM expenses WHERE user_id = ? ORDER BY category COLLATE NOCASE",
-            (session["user_id"],),
         ).fetchall()
 
     total = sum((Decimal(expense["amount"]) for expense in expenses), Decimal("0"))
@@ -355,7 +589,7 @@ def dashboard():
     return render_template(
         "view_expenses.html",
         expenses=expenses,
-        categories=[row["category"] for row in categories],
+        categories=categories,
         category_filter=category_filter,
         date_filter=date_filter,
         total=total,
@@ -395,71 +629,86 @@ def save_budget():
     return redirect(url_for("dashboard", month=month, year=year))
 
 
+@app.post("/categories/<int:category_id>/subcategories")
+@login_required
+def add_subcategory(category_id):
+    payload = request.get_json(silent=True) or {}
+    subcategory_name = normalize_category_name(payload.get("name", ""))
+    if not subcategory_name:
+        return jsonify(error="Enter a subcategory name."), 400
+
+    with database_connection() as connection:
+        category = connection.execute(
+            "SELECT id FROM categories WHERE id = ? AND user_id = ?",
+            (category_id, session["user_id"]),
+        ).fetchone()
+        if category is None:
+            abort(404)
+
+        subcategory = get_or_create_subcategory(connection, category_id, subcategory_name)
+
+    return jsonify(id=subcategory["id"], name=subcategory["name"])
+
+
 @app.route("/expenses/add", methods=["GET", "POST"])
 @login_required
 def add_expense():
-    values = {"amount": "", "category": "", "expense_date": date.today().isoformat(), "description": ""}
+    values = {
+        "amount": "",
+        "category_id": "",
+        "new_category": "",
+        "subcategory_id": "",
+        "new_subcategory": "",
+        "expense_type": "Liability",
+        "expense_date": date.today().isoformat(),
+        "description": "",
+    }
+    categories = get_user_categories(session["user_id"])
     if request.method == "POST":
-        values, errors = parse_expense_form(request.form)
+        values, errors = parse_expense_form(request.form, session["user_id"])
         if errors:
             for error in errors:
                 flash(error, "error")
-            return render_template("add_expense.html", expense=values), 400
+            return render_template("add_expense.html", expense=values, categories=categories), 400
 
         with database_connection() as connection:
-            connection.execute(
-                "INSERT INTO expenses (user_id, amount, category, expense_date, description) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (
-                    session["user_id"],
-                    values["amount"],
-                    values["category"],
-                    values["expense_date"],
-                    values["description"],
-                ),
-            )
+            save_expense(connection, session["user_id"], values)
         flash("Expense saved.", "success")
         return redirect(url_for("dashboard"))
 
-    return render_template("add_expense.html", expense=values)
+    return render_template("add_expense.html", expense=values, categories=categories)
 
 
 @app.route("/expenses/<int:expense_id>/edit", methods=["GET", "POST"])
 @login_required
 def edit_expense(expense_id):
+    categories = get_user_categories(session["user_id"])
     with database_connection() as connection:
         expense = connection.execute(
-            "SELECT id, amount, category, expense_date, description FROM expenses "
-            "WHERE id = ? AND user_id = ?",
+            "SELECT id, amount, category, category_id, subcategory_id, expense_type, "
+            "expense_date, description FROM expenses WHERE id = ? AND user_id = ?",
             (expense_id, session["user_id"]),
         ).fetchone()
         if expense is None:
             abort(404)
 
         if request.method == "POST":
-            values, errors = parse_expense_form(request.form)
+            values, errors = parse_expense_form(request.form, session["user_id"])
             if errors:
                 for error in errors:
                     flash(error, "error")
-                return render_template("edit_expense.html", expense={**dict(expense), **values}), 400
+                return render_template(
+                    "edit_expense.html",
+                    expense={**dict(expense), **values},
+                    categories=categories,
+                ), 400
 
-            connection.execute(
-                "UPDATE expenses SET amount = ?, category = ?, expense_date = ?, description = ? "
-                "WHERE id = ? AND user_id = ?",
-                (
-                    values["amount"],
-                    values["category"],
-                    values["expense_date"],
-                    values["description"],
-                    expense_id,
-                    session["user_id"],
-                ),
-            )
+            save_expense(connection, session["user_id"], values, expense_id)
 
     if request.method == "POST":
         flash("Expense updated.", "success")
         return redirect(url_for("dashboard"))
-    return render_template("edit_expense.html", expense=expense)
+    return render_template("edit_expense.html", expense=expense, categories=categories)
 
 
 @app.post("/expenses/<int:expense_id>/delete")

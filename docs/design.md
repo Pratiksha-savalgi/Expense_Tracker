@@ -53,7 +53,8 @@ The main goals are:
 - multi-user admin functionality
 - advanced analytics or graphs
 - external libraries or frameworks beyond the approved stack
-- extra fields not described in the requirements
+- payment-method tracking
+- fields not described in the requirements; Module A now explicitly includes subcategory and Liability/Savings
 
 ---
 
@@ -117,6 +118,7 @@ Responsibilities:
 
 - store user accounts
 - store expense records
+- store user-owned categories and category-owned subcategories
 - keep records linked to the owning user
 - allow retrieval and manipulation of only the logged-in user’s data
 
@@ -194,16 +196,24 @@ The logged-in user opens the Add Expense page and submits expense details.
 Fields:
 
 - amount
-- category
+- main category
+- optional subcategory
 - date
+- expense type (Liability or Savings)
 - description
 
 Validation rules:
 
-- amount must be greater than 0
+- amount must be greater than 0 and use no more than two decimal places
 - category is required
+- expense type must be Liability or Savings
 - date must be valid
 - values must be validated before saving
+
+The category dropdown contains built-in categories and per-user custom
+categories. Selecting a category updates its subcategory choices. A custom
+subcategory for an existing category can be saved directly from the form;
+when its category is also new, both are created with the expense.
 
 ### 7.4 View expenses
 
@@ -213,6 +223,8 @@ The page displays:
 
 - amount
 - category
+- subcategory when present
+- Liability/Savings type
 - date
 - description
 
@@ -380,14 +392,24 @@ The UI should support:
 
 ### 8.3 Data Model Design
 
-The current data model remains centered on the existing `users` and
-`expenses` tables, with a new `budgets` table added for Version 2.
+The data model uses `users`, `expenses`, `categories`, and `subcategories`
+for Module A, plus `budgets` for Version 2.
 
 #### Core entities
 
 - `users`: stores account and authentication data
-- `expenses`: stores user-owned spending entries, category, date, and amount
+- `expenses`: stores user-owned entries, amount, category reference, optional
+  subcategory reference, Liability/Savings type, date, and description
+- `categories`: stores normalized category names per user
+- `subcategories`: stores normalized subcategory names per category
 - `budgets`: stores month-based budget limits per user
+
+Category names are normalized by trimming and collapsing whitespace and by
+case-folding the comparison key. The display name is retained separately.
+Built-in categories and subcategories are added idempotently for each user;
+custom names remain user-scoped. Existing free-text categories are migrated
+to per-user category rows without dropping expense records. Existing rows
+default to Liability and have no subcategory until one is selected.
 
 #### Budget table design
 
@@ -615,8 +637,11 @@ Suggested fields:
 
 - id: primary key
 - user_id: foreign key to users.id
-- amount: numeric value
-- category: text value, required
+- amount: positive decimal value with no more than two fractional digits
+- category_id: foreign key to the owning user's category
+- category: canonical display value retained for compatibility
+- subcategory_id: optional foreign key to a subcategory of category_id
+- expense_type: required Liability or Savings value; legacy rows default to Liability
 - expense_date: valid date
 - description: short description
 - created_at: optional timestamp
@@ -625,6 +650,14 @@ Notes:
 
 - each expense must belong to a registered user
 - every query must include the logged-in user’s id to prevent cross-user access
+
+### 7.3 Categories and subcategories
+
+- `categories` stores a name, normalized comparison name, and owning user ID.
+- `subcategories` stores a name, normalized comparison name, and parent category ID.
+- Category names are trimmed, whitespace-collapsed, and case-folded for matching.
+- Built-in categories/subcategories are seeded idempotently for each user; custom values remain private to that user.
+- Existing expense category text is migrated to category records without dropping expense rows.
 
 ---
 
@@ -642,12 +675,14 @@ Notes:
 ### 8.2 Expense pages
 
 - Add Expense page
-  - form for amount, category, date, and description
+  - form for amount, main category, optional subcategory, date, Liability/Savings type, and optional description
+  - common category/subcategory defaults and custom-add choices
+  - immediate save action for a custom subcategory under an existing category
 - View Expenses page
-  - displays expenses for the logged-in user
+  - displays the logged-in user's expenses, including category, optional subcategory, and type
   - includes filter controls and total amount
 - Edit Expense page
-  - form prefilled with existing values
+  - form prefilled with existing expense, category, subcategory, and type values
   - saves modifications
 
 ### 8.3 Flask route responsibilities
@@ -665,6 +700,7 @@ Suggested route structure:
 - GET /expenses/<id>/edit
 - POST /expenses/<id>/edit
 - POST /expenses/<id>/delete
+- POST /categories/<category_id>/subcategories (authenticated, CSRF-protected)
 
 All expense routes should require authentication and ensure the user is only working with their own records.
 
@@ -692,8 +728,11 @@ Validation is required before saving data.
 
 ### Expense validation
 
-- amount must be greater than 0
+- amount must be greater than 0 and use no more than two decimal places
 - category must be present
+- expense type must be Liability or Savings
+- selected category must belong to the authenticated user
+- selected subcategory must belong to the selected category
 - date must be a valid date
 - description is accepted as entered, but should be treated as a short text value
 
@@ -716,6 +755,7 @@ Design principles:
 - visible action buttons for add, edit, and delete
 - straightforward list or table layout for expenses
 - simple filtering controls for category and date
+- dropdown-based category and dependent subcategory selection, with custom-add actions
 - clear total spending summary
 - plain error messages for invalid input
 

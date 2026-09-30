@@ -30,11 +30,13 @@ This work must stay aligned with:
 - Reject invalid or duplicate registration attempts.
 
 ### Expense Management
-- Add expense records with required fields.
+- Add expense records with amount, category, optional subcategory, date, description, and Liability/Savings type.
 - View expense records belonging to the current user.
 - Edit existing expense records.
 - Delete expense records.
 - Ensure records are tied to the authenticated user.
+- Provide common per-user category/subcategory choices and allow user-defined values.
+- Persist a subcategory under an existing category immediately; persist a subcategory for a new category with the saved expense.
 
 ### Expense Queries
 - Filter expenses by category and date as required by the project.
@@ -55,6 +57,10 @@ This work must stay aligned with:
 ## 4. Validation Rules
 
 - Amount must be greater than zero.
+- Expense amounts may contain no more than two decimal places.
+- Expense type must be Liability or Savings.
+- Category must belong to the authenticated user; subcategory must belong to the selected category.
+- Normalize category and subcategory comparisons for case and whitespace.
 - Budget amount must be greater than zero.
 - Expense data must include valid required fields.
 - A record must belong to a registered user.
@@ -71,6 +77,7 @@ Use straightforward Flask routes for the major flows:
 - register
 - dashboard
 - add expense
+- add subcategory to an existing category
 - edit expense
 - delete expense
 - filter expenses
@@ -85,6 +92,7 @@ Keep route names and logic consistent with the project documentation and design 
 
 - Read and write through the database layer rather than directly from the UI.
 - Use normalized, simple data handling patterns.
+- Protect JSON subcategory writes with session authentication, category ownership checks, and the CSRF token header.
 - Keep validation rules explicit and easy to review.
 - Return user-friendly error or confirmation messages to the frontend.
 - For analytics, compute totals from the authenticated user’s data only.

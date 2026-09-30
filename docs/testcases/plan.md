@@ -95,13 +95,20 @@ Use a mix of:
 
 ### Group B: Expense creation
 
-8. Add expense with valid amount, category, date, and description
+8. Add expense with valid amount, category, optional subcategory, date, type, and description
 9. Add expense with amount equal to 0
 10. Add expense with negative amount
 11. Add expense with missing category
 12. Add expense with invalid date
 13. Add expense without description
 14. Add expense by logged-in user only
+40. Reject amounts with more than two decimal places
+41. Select Liability or Savings and retain the selected type
+42. Choose a built-in category and dependent subcategory
+43. Add a custom category and subcategory
+44. Save a new subcategory for an existing category immediately and retain it in later dropdowns
+45. Normalize category/subcategory case and whitespace variants
+46. Confirm another user cannot see or select private custom categories
 
 ### Group C: Expense viewing
 
@@ -179,7 +186,7 @@ Use a mix of:
 
 ### TC-07: Add valid expense
 
-- Input: amount > 0, valid category, valid date, description
+- Input: positive amount with at most two decimal places, valid category, optional subcategory, valid date, expense type, and description
 - Expected result: expense is saved and visible in the list
 
 ### TC-08: Add expense with invalid amount
@@ -244,7 +251,55 @@ Use a mix of:
 
 ---
 
-## 7. Version 2 Test Cases
+## 7. Module A Category and Type Test Cases
+
+### TC-MA-01: Built-in category and subcategory options
+
+- Preconditions: A signed-in user opens Add Expense.
+- Expected result: Common categories and their suggested subcategories are available; choosing a category updates the subcategory list.
+
+### TC-MA-02: Add a custom category
+
+- Steps: Choose **Add category**, enter a unique name, complete a valid expense, and save.
+- Expected result: The expense and category are saved for that user, and the category is available in later forms.
+
+### TC-MA-03: Save a custom subcategory immediately
+
+- Preconditions: A signed-in user selects an existing category.
+- Steps: Choose **Add subcategory**, enter a name, and save the subcategory.
+- Expected result: The subcategory is persisted for that category, selected in the current form, and available in later add/edit forms even before saving the current expense.
+
+### TC-MA-04: Add subcategory to a new category
+
+- Steps: Add a new category and subcategory while entering a valid expense, then save the expense.
+- Expected result: The category, subcategory, and expense are saved and available to that user afterward.
+
+### TC-MA-05: Normalize category and subcategory names
+
+- Input: Names differing only by capitalization or repeated/outer spaces.
+- Expected result: Existing canonical entries are reused rather than duplicated.
+
+### TC-MA-06: Liability/Savings persistence
+
+- Steps: Create an expense with each type and edit its type.
+- Expected result: The chosen type persists and is shown in the expense list.
+
+### TC-MA-07: Amount precision
+
+- Input: Positive values with up to two decimal places, blank/invalid/zero/negative values, and values with more than two decimal places.
+- Expected result: Only positive amounts with no more than two decimal places are accepted; validation errors preserve entered values.
+
+### TC-MA-08: Legacy expense migration
+
+- Preconditions: Database contains expenses with free-text categories and no Module A columns.
+- Expected result: Expense rows remain, categories are linked to per-user category records, old type values default to Liability, and no subcategory is assigned.
+
+### TC-MA-09: Category and subcategory isolation
+
+- Steps: Create custom category/subcategory data as User A and inspect as User B.
+- Expected result: User B cannot see, select, or write to User A's custom values.
+
+## 8. Version 2 Test Cases
 
 ### TC-V2-01: Create monthly budget
 
@@ -416,7 +471,7 @@ Use a mix of:
 
 ---
 
-## 8. Acceptance checklist mapping
+## 9. Acceptance checklist mapping
 
 The test plan directly covers the acceptance criteria in the specification:
 
@@ -425,17 +480,21 @@ The test plan directly covers the acceptance criteria in the specification:
 - Login with valid credentials
 - Error for invalid credentials
 - Add expense with valid data
-- Amount greater than 0 requirement
+- Positive amount with no more than two decimal places
 - View expenses for logged-in user
 - Edit existing expense
 - Delete expense after confirmation
 - Filter by category and date
 - Display total expense amount
 - Restrict access to the logged-in user’s records only
+- Require positive expense amounts with at most two decimal places
+- Provide built-in and user-defined category/subcategory choices
+- Persist custom subcategories for later dropdown use
+- Persist and display Liability/Savings expense type
 
 ---
 
-## 8. Execution order
+## 10. Execution order
 
 1. Authentication tests
 2. Expense create and validation tests
@@ -445,10 +504,11 @@ The test plan directly covers the acceptance criteria in the specification:
 6. Filter and total tests
 7. Security and user-isolation tests
 8. Final acceptance run
+9. Module A category/subcategory migration and ownership tests
 
 ---
 
-## 9. Exit criteria
+## 11. Exit criteria
 
 The application is considered ready for acceptance when:
 
@@ -456,11 +516,12 @@ The application is considered ready for acceptance when:
 - all expense CRUD tests pass
 - filtering and total calculation pass
 - all user-isolation and security tests pass
+- category/subcategory persistence and amount precision criteria pass
 - no high-priority validation failures remain
 
 ---
 
-## 10. Recommended testing workflow for the project team
+## 12. Recommended testing workflow for the project team
 
 - Start with validation and login flows
 - Move to add/view/edit/delete flows

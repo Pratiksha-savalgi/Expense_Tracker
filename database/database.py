@@ -10,6 +10,19 @@ DATABASE_PATH = os.environ.get(
     str(PROJECT_ROOT / "database" / "expenses.sqlite3"),
 )
 
+DEFAULT_CATEGORIES = {
+    "Food": ("Breakfast", "Lunch", "Dinner", "Groceries", "Snacks"),
+    "Utilities": ("Electricity", "Water", "Internet", "Gas"),
+    "Transport": ("Public transit", "Fuel", "Vehicle maintenance"),
+    "Household": ("Supplies", "Repairs", "Furniture"),
+    "Health": ("Medical", "Pharmacy"),
+    "Shopping": ("Clothing", "Personal care"),
+    "Education": ("Books", "Fees"),
+    "Entertainment": ("Subscriptions", "Outings"),
+    "Bills": ("Rent", "Insurance", "Loan payments"),
+    "Other": ("Miscellaneous",),
+}
+
 
 @contextmanager
 def database_connection():
@@ -25,6 +38,32 @@ def database_connection():
         raise
     finally:
         connection.close()
+
+
+def normalize_category_name(name):
+    return " ".join((name or "").split())
+
+
+def seed_default_categories(user_id):
+    with database_connection() as connection:
+        for category_name, subcategory_names in DEFAULT_CATEGORIES.items():
+            normalized_category = normalize_category_name(category_name).casefold()
+            connection.execute(
+                "INSERT INTO categories (user_id, name, normalized_name) VALUES (?, ?, ?) "
+                "ON CONFLICT(user_id, normalized_name) DO NOTHING",
+                (user_id, category_name, normalized_category),
+            )
+            category = connection.execute(
+                "SELECT id FROM categories WHERE user_id = ? AND normalized_name = ?",
+                (user_id, normalized_category),
+            ).fetchone()
+            for subcategory_name in subcategory_names:
+                normalized_subcategory = normalize_category_name(subcategory_name).casefold()
+                connection.execute(
+                    "INSERT INTO subcategories (category_id, name, normalized_name) "
+                    "VALUES (?, ?, ?) ON CONFLICT(category_id, normalized_name) DO NOTHING",
+                    (category["id"], subcategory_name, normalized_subcategory),
+                )
 
 
 def initialize_database():
@@ -43,7 +82,27 @@ def initialize_database():
                 amount TEXT NOT NULL,
                 category TEXT NOT NULL,
                 expense_date TEXT NOT NULL,
-                description TEXT NOT NULL DEFAULT ''
+                description TEXT NOT NULL DEFAULT '',
+                category_id INTEGER REFERENCES categories(id) ON DELETE RESTRICT,
+                subcategory_id INTEGER REFERENCES subcategories(id) ON DELETE SET NULL,
+                expense_type TEXT NOT NULL DEFAULT 'Liability'
+                    CHECK (expense_type IN ('Liability', 'Savings'))
+            );
+
+            CREATE TABLE IF NOT EXISTS categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                normalized_name TEXT NOT NULL,
+                UNIQUE(user_id, normalized_name)
+            );
+
+            CREATE TABLE IF NOT EXISTS subcategories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                normalized_name TEXT NOT NULL,
+                UNIQUE(category_id, normalized_name)
             );
 
             CREATE TABLE IF NOT EXISTS budgets (
@@ -62,5 +121,60 @@ def initialize_database():
 
             CREATE INDEX IF NOT EXISTS budgets_by_user_month
                 ON budgets(user_id, year, month);
+            """
+        )
+
+        expense_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(expenses)")
+        }
+        if "category_id" not in expense_columns:
+            connection.execute(
+                "ALTER TABLE expenses ADD COLUMN category_id INTEGER "
+                "REFERENCES categories(id) ON DELETE RESTRICT"
+            )
+        if "subcategory_id" not in expense_columns:
+            connection.execute(
+                "ALTER TABLE expenses ADD COLUMN subcategory_id INTEGER "
+                "REFERENCES subcategories(id) ON DELETE SET NULL"
+            )
+        if "expense_type" not in expense_columns:
+            connection.execute(
+                "ALTER TABLE expenses ADD COLUMN expense_type TEXT NOT NULL "
+                "DEFAULT 'Liability' CHECK (expense_type IN ('Liability', 'Savings'))"
+            )
+
+        legacy_expenses = connection.execute(
+            "SELECT id, user_id, category FROM expenses "
+            "WHERE category_id IS NULL ORDER BY id"
+        ).fetchall()
+        for expense in legacy_expenses:
+            category_name = normalize_category_name(expense["category"]) or "Uncategorized"
+            normalized_name = category_name.casefold()
+            category = connection.execute(
+                "SELECT id, name FROM categories WHERE user_id = ? AND normalized_name = ?",
+                (expense["user_id"], normalized_name),
+            ).fetchone()
+            if category is None:
+                connection.execute(
+                    "INSERT INTO categories (user_id, name, normalized_name) VALUES (?, ?, ?)",
+                    (expense["user_id"], category_name, normalized_name),
+                )
+                category = connection.execute(
+                    "SELECT id, name FROM categories WHERE user_id = ? AND normalized_name = ?",
+                    (expense["user_id"], normalized_name),
+                ).fetchone()
+            connection.execute(
+                "UPDATE expenses SET category_id = ?, category = ? WHERE id = ?",
+                (category["id"], category["name"], expense["id"]),
+            )
+
+        connection.executescript(
+            """
+            CREATE INDEX IF NOT EXISTS categories_by_user
+                ON categories(user_id, normalized_name);
+            CREATE INDEX IF NOT EXISTS subcategories_by_category
+                ON subcategories(category_id, normalized_name);
+            CREATE INDEX IF NOT EXISTS expenses_by_category
+                ON expenses(user_id, category_id, subcategory_id);
             """
         )

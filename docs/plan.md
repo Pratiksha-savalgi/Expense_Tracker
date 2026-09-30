@@ -2,7 +2,7 @@
 
 This plan describes how to build a simple Expense Tracker for individuals to record and manage personal expenses in one place. It follows `requirements.md`, `intent.md`, `spec.md`, and `tech-stack.md`. The approved technologies are HTML, CSS, JavaScript, Flask, and SQLite only.
 
-The application will let a logged-in user add, view, edit, and delete expenses, assign a category, filter by category and date, and see total spending. Each user will see and manage only their own expenses.
+The application lets a logged-in user add, view, edit, and delete expenses; select a main category and optional subcategory; classify each entry as Liability or Savings; filter by category and date; and see total spending. Each user sees and manages only their own expense and category data.
 
 ## Proposed project folder and file structure
 
@@ -25,18 +25,18 @@ expense_tracker_app/
     edit_expense.html
 ```
 
-SQLite will store user accounts and expense records. The database file is created and used by the application when it runs; it is not a source file to write by hand.
+SQLite stores user accounts, expenses, per-user categories and subcategories, and monthly budgets. The database file is created and used by the application when it runs; it is not a source file to write by hand.
 
 ## What each file will be responsible for
 
 **`app.py`**  
-Flask application. Handles registration, login, credential checks, and all expense operations: add, view, edit, delete, filter by category and date, and total spending. Applies validation and makes sure a user can access only their own expenses.
+Flask application. Handles registration, login, credential checks, expense CRUD, category/subcategory resolution, filtering, and totals. Validates positive amounts to two decimal places and ensures a user can access only their own data.
 
 **`static/style.css`**  
 Styles the pages so forms, the expense list or table, errors, and delete confirmation are simple and easy to use.
 
 **`static/script.js`**  
-Handles page interactions: form actions, delete confirmation, and filtering by category and date.
+Handles page interactions: delete confirmation, filtering, dependent subcategory options, and immediate saving of custom subcategories for existing categories.
 
 **`templates/register.html`**  
 Page for creating an account.
@@ -45,10 +45,10 @@ Page for creating an account.
 Page for logging in with username/email and password.
 
 **`templates/add_expense.html`**  
-Page for entering amount, category, date, and a short description, then saving a new expense.
+Page for entering amount, category, optional subcategory, date, Liability/Savings type, and optional description. Includes built-in category suggestions and custom-add controls.
 
 **`templates/view_expenses.html`**  
-Page that shows the user’s expenses in a list or table (amount, category, date, and description), filter controls for category and date, total spending, and actions to edit or delete.
+Page that shows the user’s expenses (amount, category, optional subcategory, type, date, and description), category/date filters, total spending, and edit/delete actions.
 
 **`templates/edit_expense.html`**  
 Page for changing an existing expense and saving the updated details.
@@ -89,7 +89,7 @@ SQLite
 - **CSS** makes those screens readable and easy to follow.
 - **JavaScript** supports form actions, showing errors where needed, delete confirmation, and filtering in the list or table.
 - **Flask** receives what the user submits, checks credentials, applies rules, reads and writes SQLite, and returns the HTML pages.
-- **SQLite** stores accounts and expenses (amount, category, date, description) in one place.
+- **SQLite** stores accounts, expenses, user-owned category/subcategory options, and monthly budgets.
 
 The browser talks to Flask. Flask talks to SQLite. Flask then shows updated pages to the user.
 
@@ -108,10 +108,10 @@ The browser talks to Flask. Flask talks to SQLite. Flask then shows updated page
 ## How add, view, edit, and delete will work
 
 **Add**  
-The user selects Add Expense, enters amount, category, date, and a short description, and clicks Save. Flask validates the details. If they are valid, Flask saves the expense in SQLite for that user.
+The user selects Add Expense, enters amount, main category, optional subcategory, date, Liability/Savings type, and optional description, then clicks Save. Flask validates the details. Built-in category/subcategory choices and the user's custom choices are available. A custom subcategory for an existing category can be saved to its dropdown immediately; a new category and its subcategory are persisted when the expense is saved.
 
 **View**  
-The user selects View Expenses. Flask retrieves that user’s recorded expenses from SQLite and displays them in a list or table. Amount, category, date, and description are visible.
+The user selects View Expenses. Flask retrieves that user’s recorded expenses from SQLite and displays amount, category, optional subcategory, Liability/Savings type, date, and description.
 
 **Edit**  
 The user selects an expense and clicks Edit, changes the required details, and clicks Save. Flask updates that user’s expense in SQLite. This is for correcting information that was entered incorrectly.
@@ -121,8 +121,8 @@ The user selects an expense and clicks Delete. The application asks for confirma
 
 ## How category/date filtering and total spending will work
 
-**Category**  
-The user assigns a category when adding or editing an expense. An expense must have a category so spending can be organized and understood.
+**Category**
+The user selects a built-in or previously saved category, or adds a custom category. Each category has suggested and user-defined subcategories. Category and subcategory names are normalized for case and whitespace, and each user's custom values remain private to that user.
 
 **Filter**  
 On the view page, the user can filter expenses by category and date. Flask (and JavaScript for the page interaction) limits the list or table to matching records for that user. This supports checking spending by date or category.
@@ -205,8 +205,10 @@ The Version 2 release extends the app with monthly budget management and categor
 
 **Validation**
 
-- Expense amount must be greater than 0.
+- Expense amount must be greater than 0 and use no more than two decimal places.
 - An expense must have a category.
+- Expense type must be Liability or Savings.
+- A selected subcategory must belong to the selected category.
 - The expense date must be a valid date.
 - Details are validated before an expense is saved.
 - An expense must belong to a registered user.
@@ -241,16 +243,20 @@ Use this checklist after the steps above. It matches the specification’s accep
 
 **Add expense**
 
-- [ ] User can add an expense with amount, category, date, and description.
-- [ ] Amount greater than 0 is saved.
+- [ ] User can add an expense with amount, category, optional subcategory, date, type, and description.
+- [ ] Built-in categories/subcategories and custom-add choices appear in the form.
+- [ ] A custom subcategory under an existing category is saved immediately and remains in the dropdown.
+- [ ] Liability/Savings type is retained in the expense list.
+- [ ] Amount greater than 0 with at most two decimal places is saved.
 - [ ] Amount that is not greater than 0 is not saved.
+- [ ] Amount with more than two decimal places is rejected with entered values preserved.
 - [ ] Expense without a category is not saved.
 - [ ] Invalid date is not saved.
 
 **View expenses**
 
 - [ ] User can view their expenses in a list or table.
-- [ ] Amount, category, date, and description are visible.
+- [ ] Amount, category, optional subcategory, type, date, and description are visible.
 
 **Edit expense**
 

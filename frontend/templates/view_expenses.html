@@ -22,7 +22,7 @@
       <select id="category-filter" name="category">
         <option value="">All categories</option>
         {% for category in categories %}
-        <option value="{{ category }}" {% if category == category_filter %}selected{% endif %}>{{ category }}</option>
+        <option value="{{ category.id }}" {% if category.id|string == category_filter %}selected{% endif %}>{{ category.name }}</option>
         {% endfor %}
       </select>
     </div>
@@ -170,7 +170,13 @@
         {% for expense in expenses %}
         <tr>
           <td class="amount-cell">{{ format_money(expense.amount) }}</td>
-          <td><span class="category-label">{{ expense.category }}</span></td>
+          <td>
+            <span class="category-label">{{ expense.category }}</span>
+            <div class="expense-meta">
+              {% if expense.subcategory %}<span>{{ expense.subcategory }}</span><span aria-hidden="true"> · </span>{% endif %}
+              <span>{{ expense.expense_type }}</span>
+            </div>
+          </td>
           <td class="date-cell">{{ expense.expense_date }}</td>
           <td class="description-cell">{{ expense.description or '—' }}</td>
           <td class="action-cell">

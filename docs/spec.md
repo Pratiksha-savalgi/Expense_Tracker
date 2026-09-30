@@ -20,28 +20,34 @@ This specification defines the Expense Tracker based on `requirements.md` and `i
 When adding an expense, the user enters:
 
 - Amount
-- Category
+- Main category
+- Optional subcategory
 - Date
+- Expense type: Liability or Savings
 - A short description
 
 
-When viewing expenses, amount, category, date, and description should be visible.
+When viewing expenses, amount, main category, optional subcategory, date,
+expense type, and description should be visible.
 
 ## Add Expense
 
 - The user selects Add Expense.
-- The user enters amount, category, date, and description.
+- The user enters amount, main category, optional subcategory, date, expense
+  type, and description.
 - The user clicks Save.
 - The system validates the details.
 - If the details are valid, the system saves the expense.
-- The amount must be greater than 0.
+- The amount must be greater than 0 and have no more than two decimal places.
+- The selected category and subcategory must belong to the logged-in user.
 
 ## View Expense
 
 - The user selects View Expenses.
 - The system retrieves the recorded expenses for that user.
 - The system displays the expenses in a list or table.
-- Amount, category, date, and description are visible.
+- Amount, category, subcategory when present, date, expense type, and
+  description are visible.
 - The user can view all of their records.
 
 ## Edit Expense
@@ -65,8 +71,25 @@ When viewing expenses, amount, category, date, and description should be visible
 
 ## Expense categorization
 
-- The user assigns a category to an expense.
+- The user selects a main category from a dropdown populated with common
+  defaults and that user's custom categories.
+- Default categories include Food, Utilities, Transport, Household, Health,
+  Shopping, Education, Entertainment, Bills, and Other.
+- Their built-in subcategories are Food (Breakfast, Lunch, Dinner, Groceries,
+  Snacks); Utilities (Electricity, Water, Internet, Gas); Transport (Public
+  transit, Fuel, Vehicle maintenance); Household (Supplies, Repairs,
+  Furniture); Health (Medical, Pharmacy); Shopping (Clothing, Personal care);
+  Education (Books, Fees); Entertainment (Subscriptions, Outings); Bills
+  (Rent, Insurance, Loan payments); and Other (Miscellaneous).
+- Selecting a main category presents its suggested and previously saved
+  subcategories.
+- The user can add a custom category or subcategory from the expense form.
+- A subcategory added under an existing category is saved immediately and
+  appears in subsequent dropdowns. A subcategory for a new category is saved
+  when the expense is saved.
+- Category names are normalized for case and whitespace to avoid duplicates.
 - An expense must have a category.
+- An expense must be classified as Liability or Savings.
 - Categories help the user understand where money is being spent and keep expenses organized.
 
 ## Filtering by category and date
@@ -82,8 +105,11 @@ When viewing expenses, amount, category, date, and description should be visible
 
 ## Validation rules
 
-- Expense amount must be greater than 0.
+- Expense amount must be greater than 0 and use no more than two decimal places.
+- Expense amount must have no more than two decimal places.
 - An expense must have a category.
+- Expense type must be Liability or Savings.
+- Optional subcategories must belong to the selected category.
 - An expense must belong to a registered user.
 - The expense date must be a valid date.
 - Add Expense details are validated before the expense is saved.
@@ -116,7 +142,10 @@ When viewing expenses, amount, category, date, and description should be visible
 **Add Expense**
 
 - User can add an expense with valid details.
-- Amount must be greater than 0.
+- Amount must be positive and use no more than two decimal places.
+- User can select default or custom categories and subcategories.
+- User can add a subcategory that remains available for later expense entry.
+- Liability/Savings type is saved and shown with the expense.
 
 **View Expenses**
 
@@ -139,6 +168,14 @@ When viewing expenses, amount, category, date, and description should be visible
 **Total Spending**
 
 - System displays the total expense amount.
+
+**Expense Categories and Type**
+
+- Common categories and their subcategories are available in the expense form.
+- Custom categories and subcategories can be added by the signed-in user.
+- New subcategories for existing categories are saved immediately and
+  available in later forms.
+- Category and subcategory data is isolated by user.
 
 ## Version 2 Feature Specification
 

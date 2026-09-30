@@ -132,7 +132,8 @@ the Expense Tracker. Steps:
 
 User selects Add Expense.
 
-User enters the expense amount, category, date, and description.
+User enters the expense amount, main category, optional subcategory, date,
+Liability/Savings type, and optional description.
 
 User clicks Save.
 
@@ -200,14 +201,15 @@ should also be able to check their total spending.
 
 Q3. What information should be entered when adding an expense?
 
-The user should enter the amount, category, date and a short description
-of the expense. Payment method can also be recorded.
+The user enters an amount, main category, optional subcategory, date,
+expense type (Liability or Savings), and optional short description.
+Amounts must be positive and use no more than two decimal places.
 
 Q4. How should the user view their expenses?
 
 The user should be able to view all their expenses in a list or table.
-The details such as amount, category, date and description should be
-visible.
+The details such as amount, category, optional subcategory, type, date, and
+description should be visible.
 
 Q5. Should the user be able to edit or delete an expense?
 
@@ -257,6 +259,36 @@ Non-Functional Requirements
 
 NFR-01: Security: Users should only be able to access their own
 expenses.
+
+## Module A Requirements: Expense Categories and Types
+
+These requirements extend expense entry without changing the approved
+Flask, SQLite, HTML, CSS, or JavaScript stack.
+
+- Expense amount is required, positive, and limited to two decimal places.
+- Expense forms provide a per-user category dropdown with common defaults:
+  Food, Utilities, Transport, Household, Health, Shopping, Education,
+  Entertainment, Bills, and Other.
+- Default subcategories are: Food (Breakfast, Lunch, Dinner, Groceries,
+  Snacks); Utilities (Electricity, Water, Internet, Gas); Transport (Public
+  transit, Fuel, Vehicle maintenance); Household (Supplies, Repairs,
+  Furniture); Health (Medical, Pharmacy); Shopping (Clothing, Personal care);
+  Education (Books, Fees); Entertainment (Subscriptions, Outings); Bills
+  (Rent, Insurance, Loan payments); Other (Miscellaneous).
+- Users can create custom categories and subcategories from the expense
+  form. A subcategory added under an existing category is saved immediately
+  and remains available in that category's dropdown. For a newly created
+  category, its subcategory is saved with the expense.
+- Category and subcategory names are normalized for case and whitespace so
+  equivalent names do not create duplicates for the same user/category.
+- Every expense records a required type: Liability or Savings.
+- Categories and subcategories are user-scoped. A user cannot select or
+  manage another user's category data.
+- Existing free-text expense categories are migrated to user-owned category
+  records without deleting expenses. Existing expense types default to
+  Liability and existing subcategories remain empty until assigned.
+- The expense list displays category, optional subcategory, and type. Existing
+  category/date filtering and filtered totals continue to work.
 
 ## Version 2 Requirements (Budget Tracking and Category Analytics)
 
@@ -438,7 +470,7 @@ application usage.
 
 Rules/Constraints
 
-R-01: Expense amount must be greater than 0.
+R-01: Expense amount must be greater than 0 and use no more than two decimal places.
 
 R-02: An expense must have a category.
 
@@ -464,7 +496,7 @@ Error is shown for invalid credentials.
 
 User can add an expense with valid details.
 
-Amount must be greater than 0.
+Amount must be positive and use no more than two decimal places.
 
 04: View Expenses
 
