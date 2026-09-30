@@ -35,6 +35,55 @@
   </form>
 </section>
 
+<section class="records-section" aria-labelledby="analytics-title">
+  <div class="records-heading">
+    <div>
+      <p class="eyebrow">Insights</p>
+      <h2 id="analytics-title">Category analytics</h2>
+    </div>
+  </div>
+  <form class="filter-form" method="get" action="{{ url_for('dashboard') }}">
+    <div class="filter-field">
+      <label for="analytics-month">Month</label>
+      <input id="analytics-month" name="analytics_month" type="month" value="{{ analytics_month }}">
+    </div>
+    <button class="button button-outline" type="submit">View analytics</button>
+  </form>
+
+  {% if analytics_items %}
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Category</th>
+          <th scope="col">Total</th>
+          <th scope="col">Contribution</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in analytics_items %}
+        <tr>
+          <td>{{ item.category }}</td>
+          <td>{{ format_money(item.total) }}</td>
+          <td>{{ '%.1f'|format(item.percentage) }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="summary-note">
+    Highest-spending category: {% if highest_category %}{{ highest_category.category }}{% else %}None{% endif %}
+    · Lowest-spending category: {% if lowest_category %}{{ lowest_category.category }}{% else %}None{% endif %}
+  </p>
+  {% else %}
+  <div class="empty-state">
+    <span class="empty-mark" aria-hidden="true">%</span>
+    <h3>No category data for {{ analytics_month }}</h3>
+    <p>Add expenses for this month to see category totals and contribution percentages.</p>
+  </div>
+  {% endif %}
+</section>
+
 <section class="budget-panel" aria-labelledby="budget-panel-title">
   <div class="budget-header">
     <div>
