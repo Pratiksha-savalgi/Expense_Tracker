@@ -298,6 +298,7 @@ def logout():
 def dashboard():
     category_filter = request.args.get("category", "").strip()
     date_filter = request.args.get("date", "").strip()
+    analytics_month = request.args.get("analytics_month", date.today().strftime("%Y-%m")).strip()
     if date_filter:
         try:
             parsed_date = date.fromisoformat(date_filter)
@@ -315,6 +316,17 @@ def dashboard():
     except (ValueError, TypeError):
         flash("Choose a valid month for category analytics.", "error")
         analytics_month = date.today().strftime("%Y-%m")
+
+    try:
+        selected_month = int(request.args.get("month", date.today().month))
+        selected_year = int(request.args.get("year", date.today().year))
+        if selected_month < 1 or selected_month > 12:
+            raise ValueError
+        date(selected_year, selected_month, 1)
+    except (ValueError, TypeError):
+        flash("Choose a valid month and year for budget tracking.", "error")
+        selected_month = date.today().month
+        selected_year = date.today().year
 
     conditions = ["user_id = ?"]
     values = [session["user_id"]]
@@ -338,6 +350,8 @@ def dashboard():
         ).fetchall()
 
     total = sum((Decimal(expense["amount"]) for expense in expenses), Decimal("0"))
+    analytics = get_category_analytics(session["user_id"], analytics_month)
+    budget = get_budget_summary(session["user_id"], selected_month, selected_year)
     return render_template(
         "view_expenses.html",
         expenses=expenses,
@@ -345,7 +359,40 @@ def dashboard():
         category_filter=category_filter,
         date_filter=date_filter,
         total=total,
+        analytics_month=analytics["month"],
+        analytics_items=analytics["items"],
+        highest_category=analytics["highest_category"],
+        lowest_category=analytics["lowest_category"],
+        budget=budget,
+        selected_month=selected_month,
+        selected_year=selected_year,
     )
+
+
+@app.post("/budget")
+@login_required
+def save_budget():
+    try:
+        month = int(request.form.get("month", ""))
+        year = int(request.form.get("year", ""))
+        amount = Decimal(request.form.get("budget_amount", "").strip())
+        date(year, month, 1)
+        if not amount.is_finite() or amount <= 0:
+            raise ValueError
+    except (InvalidOperation, ValueError, TypeError):
+        flash("Enter a valid month, year, and budget amount greater than zero.", "error")
+        return redirect(url_for("dashboard"))
+
+    with database_connection() as connection:
+        connection.execute(
+            "INSERT INTO budgets (user_id, month, year, budget_amount) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(user_id, month, year) DO UPDATE SET "
+            "budget_amount = excluded.budget_amount, updated_at = CURRENT_TIMESTAMP",
+            (session["user_id"], month, year, format(amount, "f")),
+        )
+
+    flash("Monthly budget saved.", "success")
+    return redirect(url_for("dashboard", month=month, year=year))
 
 
 @app.route("/expenses/add", methods=["GET", "POST"])
