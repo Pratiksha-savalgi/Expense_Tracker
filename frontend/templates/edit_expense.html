@@ -2,7 +2,7 @@
 {% block title %}Edit expense{% endblock %}
 {% block content %}
 <div class="content-narrow">
-  <a class="back-link" href="{{ url_for('dashboard') }}"><span aria-hidden="true">←</span> All expenses</a>
+  <a class="back-link" href="{{ url_for('expenses') }}"><span aria-hidden="true">←</span> All expenses</a>
   <section class="form-page-heading">
     <p class="eyebrow">Expense record</p>
     <h1>Edit an expense</h1>
@@ -64,7 +64,7 @@
       </div>
     </div>
     <div class="form-actions">
-      <a class="button button-quiet" href="{{ url_for('dashboard') }}">Cancel</a>
+      <a class="button button-quiet" href="{{ url_for('expenses') }}">Cancel</a>
       <button class="button button-primary" type="submit">Save changes <span aria-hidden="true">→</span></button>
     </div>
   </form>

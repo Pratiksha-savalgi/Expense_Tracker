@@ -97,10 +97,10 @@ class ExpenseCategoryTestCase(unittest.TestCase):
         self.assertEqual(expense["subcategory_name"], "Dinner")
         self.assertEqual(expense["expense_type"], "Savings")
 
-        dashboard = self.client.get("/dashboard").get_data(as_text=True)
-        self.assertIn("Food", dashboard)
-        self.assertIn("Dinner", dashboard)
-        self.assertIn("Savings", dashboard)
+        expense_list = self.client.get("/expenses").get_data(as_text=True)
+        self.assertIn("Food", expense_list)
+        self.assertIn("Dinner", expense_list)
+        self.assertIn("Savings", expense_list)
 
     def test_new_user_sees_default_categories_and_custom_add_options(self):
         body = self.client.get("/expenses/add").get_data(as_text=True)
@@ -202,7 +202,7 @@ class ExpenseCategoryTestCase(unittest.TestCase):
                 body = response.get_data(as_text=True)
                 self.assertEqual(response.status_code, 400)
                 self.assertIn(expected_message, body)
-                self.assertIn("selected>Food</option>", body)
+                self.assertIn('id="new_category" name="new_category" type="text" value="Food"', body)
                 with database_connection() as connection:
                     count = connection.execute("SELECT COUNT(*) FROM expenses").fetchone()[0]
                     category_count = connection.execute("SELECT COUNT(*) FROM categories").fetchone()[0]
@@ -237,7 +237,7 @@ class ExpenseCategoryTestCase(unittest.TestCase):
             )
         )
 
-        response = self.client.get(f"/dashboard?category={food_id}&date={today}")
+        response = self.client.get(f"/expenses?category={food_id}&date={today}")
         body = response.get_data(as_text=True)
         ledger = body.split('aria-labelledby="records-title">', 1)[1]
         self.assertEqual(response.status_code, 200)

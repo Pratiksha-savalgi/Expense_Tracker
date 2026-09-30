@@ -15,6 +15,12 @@
       <span>ledger<span class="brand-period">.</span></span>
     </a>
     {% if session.get('user_id') %}
+    <nav class="primary-nav" aria-label="Main navigation">
+      <a href="{{ url_for('dashboard') }}">Dashboard</a>
+      <a href="{{ url_for('expenses') }}">Expenses</a>
+      <a href="{{ url_for('analytics_page') }}">Analytics</a>
+      <a href="{{ url_for('budget_page') }}">Budget</a>
+    </nav>
     <div class="header-user">
       <span class="user-name">{{ session.get('user_username') }}</span>
       <form action="{{ url_for('logout') }}" method="post">

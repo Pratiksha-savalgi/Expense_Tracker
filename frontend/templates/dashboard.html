@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<section class="dashboard-chart-section" aria-labelledby="utilization-title">
+  <div class="chart-page-heading">
+    <div>
+      <p class="eyebrow">{{ period_label }}</p>
+      <h1 id="utilization-title">Monthly budget utilization</h1>
+    </div>
+    <form class="period-switcher" method="get" action="{{ url_for('dashboard') }}">
+      <label for="dashboard-period">Month</label>
+      <input id="dashboard-period" name="period" type="month" value="{{ period }}">
+      <button class="button button-outline" type="submit">Show</button>
+    </form>
+  </div>
+
+  {% if budget.budget_amount is not none %}
+  <figure class="budget-pie-figure">
+    <div class="budget-chart"
+      role="img" aria-label="{{ period_label }}: expenditure {{ format_money(budget.total_spent) }}, including liability {{ format_money(budget.liability_total) }} and savings {{ format_money(budget.savings_total) }}; remaining budget {{ format_money(budget.remaining if budget.remaining > 0 else 0) }}; {{ '%.1f'|format(budget.utilization) }} percent utilized."
+      style="--liability-end: {{ '%.3f'|format(budget.liability_chart_end) }}%; --expenditure-end: {{ '%.3f'|format(budget.expenditure_chart_end) }}%;">
+      <span class="chart-center">
+        <strong>{{ '%.1f'|format(budget.utilization) }}%</strong>
+        <small>utilized</small>
+      </span>
+    </div>
+    <figcaption class="chart-legend">
+      <span><i class="legend-swatch legend-liability"></i>Liability {{ format_money(budget.liability_total) }}</span>
+      <span><i class="legend-swatch legend-savings"></i>Savings {{ format_money(budget.savings_total) }}</span>
+      <span><i class="legend-swatch legend-remaining"></i>Remaining {{ format_money(budget.remaining if budget.remaining > 0 else 0) }}</span>
+    </figcaption>
+  </figure>
+  {% else %}
+  <figure class="budget-pie-figure">
+    <div class="budget-chart budget-chart-empty" role="img" aria-label="No budget set for {{ period_label }}">
+      <span class="chart-center"><strong>Not set</strong><small>monthly budget</small></span>
+    </div>
+    <figcaption class="chart-legend"><span><i class="legend-swatch legend-remaining"></i>No budget set for {{ period_label }}</span></figcaption>
+  </figure>
+  {% endif %}
+</section>
+{% endblock %}

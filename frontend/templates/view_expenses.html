@@ -16,7 +16,7 @@
     <strong>{{ format_money(total) }}</strong>
     <span class="summary-note">{{ expenses|length }} {% if expenses|length == 1 %}record{% else %}records{% endif %}{% if category_filter or date_filter %} matching filters{% endif %}</span>
   </div>
-  <form class="filter-form" method="get" action="{{ url_for('dashboard') }}">
+  <form class="filter-form" method="get" action="{{ url_for('expenses') }}">
     <div class="filter-field">
       <label for="category-filter">Category</label>
       <select id="category-filter" name="category">
@@ -31,126 +31,7 @@
       <input id="date-filter" name="date" type="date" value="{{ date_filter }}">
     </div>
     <button class="button button-outline" type="submit">Apply filters</button>
-    {% if category_filter or date_filter %}<a class="clear-filter" href="{{ url_for('dashboard') }}">Clear</a>{% endif %}
-  </form>
-</section>
-
-<section class="records-section" aria-labelledby="analytics-title">
-  <div class="records-heading">
-    <div>
-      <p class="eyebrow">Insights</p>
-      <h2 id="analytics-title">Category analytics</h2>
-    </div>
-  </div>
-  <form class="filter-form" method="get" action="{{ url_for('dashboard') }}">
-    <div class="filter-field">
-      <label for="analytics-month">Month</label>
-      <input id="analytics-month" name="analytics_month" type="month" value="{{ analytics_month }}">
-    </div>
-    <button class="button button-outline" type="submit">View analytics</button>
-  </form>
-
-  {% if analytics_items %}
-  <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th scope="col">Category</th>
-          <th scope="col">Total</th>
-          <th scope="col">Contribution</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in analytics_items %}
-        <tr>
-          <td>{{ item.category }}</td>
-          <td>{{ format_money(item.total) }}</td>
-          <td>{{ '%.1f'|format(item.percentage) }}%</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <p class="summary-note">
-    Highest-spending category: {% if highest_category %}{{ highest_category.category }}{% else %}None{% endif %}
-    · Lowest-spending category: {% if lowest_category %}{{ lowest_category.category }}{% else %}None{% endif %}
-  </p>
-  {% else %}
-  <div class="empty-state">
-    <span class="empty-mark" aria-hidden="true">%</span>
-    <h3>No category data for {{ analytics_month }}</h3>
-    <p>Add expenses for this month to see category totals and contribution percentages.</p>
-  </div>
-  {% endif %}
-</section>
-
-<section class="budget-panel" aria-labelledby="budget-panel-title">
-  <div class="budget-header">
-    <div>
-      <p class="eyebrow">Monthly budget</p>
-      <h2 id="budget-panel-title">Budget status</h2>
-    </div>
-    <span class="budget-status budget-status-{{ budget.status }}">{{ budget.status_label }}</span>
-  </div>
-
-  <div class="budget-grid">
-    <div class="budget-card">
-      <span class="budget-label">Budget</span>
-      {% if budget.budget_amount is not none %}
-      <strong>{{ format_money(budget.budget_amount) }}</strong>
-      {% else %}
-      <strong>Not set</strong>
-      {% endif %}
-    </div>
-    <div class="budget-card">
-      <span class="budget-label">Spent</span>
-      <strong>{{ format_money(budget.total_spent) }}</strong>
-    </div>
-    <div class="budget-card">
-      <span class="budget-label">Remaining</span>
-      {% if budget.remaining is not none %}
-      <strong>{{ format_money(budget.remaining) }}</strong>
-      {% else %}
-      <strong>—</strong>
-      {% endif %}
-    </div>
-    <div class="budget-card">
-      <span class="budget-label">Utilization</span>
-      {% if budget.budget_amount is not none %}
-      <strong>{{ '%.1f'|format(budget.utilization) }}%</strong>
-      {% else %}
-      <strong>0%</strong>
-      {% endif %}
-    </div>
-  </div>
-
-  <p class="budget-note">{{ budget.message }}</p>
-
-  <form class="budget-form" method="post" action="{{ url_for('save_budget') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <div class="budget-fields">
-      <div class="filter-field">
-        <label for="budget-month">Month</label>
-        <select id="budget-month" name="month">
-          {% for month_number in range(1, 13) %}
-          <option value="{{ month_number }}" {% if month_number == selected_month %}selected{% endif %}>{{ month_number }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="filter-field">
-        <label for="budget-year">Year</label>
-        <select id="budget-year" name="year">
-          {% for year_value in range(2024, 2036) %}
-          <option value="{{ year_value }}" {% if year_value == selected_year %}selected{% endif %}>{{ year_value }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="filter-field budget-amount-field">
-        <label for="budget-amount">Budget amount</label>
-        <input id="budget-amount" name="budget_amount" type="number" min="0.01" step="0.01" placeholder="25000" value="{{ budget.budget_amount if budget.budget_amount is not none else '' }}">
-      </div>
-      <button class="button button-primary" type="submit">Save budget</button>
-    </div>
+    {% if category_filter or date_filter %}<a class="clear-filter" href="{{ url_for('expenses') }}">Clear</a>{% endif %}
   </form>
 </section>
 

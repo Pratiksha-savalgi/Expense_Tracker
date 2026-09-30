@@ -3,7 +3,6 @@ from decimal import Decimal, InvalidOperation
 from functools import wraps
 import hmac
 import os
-import re
 import secrets
 import sqlite3
 from pathlib import Path
@@ -11,12 +10,7 @@ from pathlib import Path
 from flask import Flask, abort, flash, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from database.database import (
-    database_connection,
-    initialize_database,
-    normalize_category_name,
-    seed_default_categories,
-)
+from database.database import database_connection, initialize_database, normalize_category_name, seed_default_categories
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 app = Flask(
@@ -57,8 +51,6 @@ def template_helpers():
 def protect_form_submissions():
     if request.method == "POST":
         submitted_token = request.form.get("csrf_token", "")
-        if not submitted_token and request.is_json:
-            submitted_token = request.headers.get("X-CSRF-Token", "")
         saved_token = session.get("csrf_token", "")
         if not saved_token or not hmac.compare_digest(submitted_token, saved_token):
             abort(400)
@@ -72,150 +64,33 @@ def login_required(view):
             flash("Sign in to access your expenses.", "error")
             return redirect(url_for("login"))
         with database_connection() as connection:
-            user = connection.execute(
-                "SELECT id FROM users WHERE id = ?",
-                (user_id,),
-            ).fetchone()
+            user = connection.execute("SELECT id FROM users WHERE id = ?", (user_id,)).fetchone()
         if user is None:
             session.clear()
-            flash("Your session is no longer valid. Please sign in again.", "error")
+            flash("Your session has expired. Sign in again.", "error")
             return redirect(url_for("login"))
         return view(**kwargs)
 
     return wrapped_view
 
 
-def get_user_categories(user_id):
-    seed_default_categories(user_id)
-    with database_connection() as connection:
-        rows = connection.execute(
-            "SELECT c.id AS category_id, c.name AS category_name, "
-            "s.id AS subcategory_id, s.name AS subcategory_name "
-            "FROM categories c LEFT JOIN subcategories s ON s.category_id = c.id "
-            "WHERE c.user_id = ? ORDER BY c.name COLLATE NOCASE, s.name COLLATE NOCASE",
-            (user_id,),
-        ).fetchall()
-
-    categories_by_id = {}
-    for row in rows:
-        category = categories_by_id.setdefault(
-            row["category_id"],
-            {"id": row["category_id"], "name": row["category_name"], "subcategories": []},
-        )
-        if row["subcategory_id"] is not None:
-            category["subcategories"].append(
-                {"id": row["subcategory_id"], "name": row["subcategory_name"]}
-            )
-    return list(categories_by_id.values())
-
-
-def parse_expense_form(form, user_id):
+def parse_expense_form(form):
     amount_text = form.get("amount", "").strip()
-    category_choice = form.get("category_id", "").strip()
-    new_category = normalize_category_name(form.get("new_category", ""))
-    if not category_choice and form.get("category", "").strip():
-        category_choice = "__new__"
-        new_category = normalize_category_name(form.get("category", ""))
-    subcategory_choice = form.get("subcategory_id", "").strip()
-    new_subcategory = normalize_category_name(form.get("new_subcategory", ""))
+    category = form.get("category", "").strip()
     expense_date = form.get("expense_date", "").strip()
     description = form.get("description", "").strip()
-    expense_type = form.get("expense_type", "Liability").strip().casefold()
     errors = []
 
-    amount = None
-    if not amount_text:
-        errors.append("Enter an amount.")
-    else:
-        try:
-            amount = Decimal(amount_text)
-            if not amount.is_finite():
-                errors.append("Enter a valid amount.")
-            elif amount <= 0:
-                errors.append("Amount must be greater than zero.")
-            elif not re.fullmatch(r"(?:\d+(?:\.\d{0,2})?|\.\d{1,2})", amount_text):
-                errors.append("Amount must use no more than two decimal places.")
-        except InvalidOperation:
-            errors.append("Enter a valid amount, such as 32.12.")
+    try:
+        amount = Decimal(amount_text)
+        if not amount.is_finite() or amount <= 0:
+            errors.append("Amount must be greater than zero.")
+    except InvalidOperation:
+        amount = None
+        errors.append("Enter a valid amount greater than zero.")
 
-    category_id = None
-    category_name = ""
-    if category_choice == "__new__":
-        if not new_category:
-            errors.append("Enter a name for the new category.")
-        else:
-            normalized_name = new_category.casefold()
-            with database_connection() as connection:
-                category = connection.execute(
-                    "SELECT id, name FROM categories WHERE user_id = ? AND normalized_name = ?",
-                    (user_id, normalized_name),
-                ).fetchone()
-            if category is not None:
-                category_id = str(category["id"])
-                category_name = category["name"]
-                new_category = ""
-            else:
-                category_name = new_category
-    else:
-        try:
-            selected_category_id = int(category_choice)
-        except ValueError:
-            selected_category_id = None
-        if selected_category_id is None:
-            errors.append("Choose a category or add a new one.")
-        else:
-            with database_connection() as connection:
-                category = connection.execute(
-                    "SELECT id, name FROM categories WHERE id = ? AND user_id = ?",
-                    (selected_category_id, user_id),
-                ).fetchone()
-            if category is None:
-                errors.append("Choose a valid category.")
-            else:
-                category_id = str(category["id"])
-                category_name = category["name"]
-
-    subcategory_id = None
-    subcategory_name = ""
-    if subcategory_choice == "__new__":
-        if not new_subcategory:
-            errors.append("Enter a name for the new subcategory.")
-        else:
-            subcategory_name = new_subcategory
-            if category_id is not None:
-                with database_connection() as connection:
-                    subcategory = connection.execute(
-                        "SELECT id, name FROM subcategories "
-                        "WHERE category_id = ? AND normalized_name = ?",
-                        (int(category_id), new_subcategory.casefold()),
-                    ).fetchone()
-                if subcategory is not None:
-                    subcategory_id = str(subcategory["id"])
-                    subcategory_name = subcategory["name"]
-                    new_subcategory = ""
-    elif subcategory_choice:
-        try:
-            selected_subcategory_id = int(subcategory_choice)
-        except ValueError:
-            selected_subcategory_id = None
-        if selected_subcategory_id is None or category_id is None:
-            errors.append("Choose a subcategory belonging to the selected category.")
-        else:
-            with database_connection() as connection:
-                subcategory = connection.execute(
-                    "SELECT id, name FROM subcategories WHERE id = ? AND category_id = ?",
-                    (selected_subcategory_id, int(category_id)),
-                ).fetchone()
-            if subcategory is None:
-                errors.append("Choose a subcategory belonging to the selected category.")
-            else:
-                subcategory_id = str(subcategory["id"])
-                subcategory_name = subcategory["name"]
-
-    if expense_type not in {"liability", "savings"}:
-        errors.append("Choose whether this entry is a liability or savings.")
-    else:
-        expense_type = expense_type.title()
+    if not category:
+        errors.append("Enter a category.")
 
     try:
         parsed_date = date.fromisoformat(expense_date)
@@ -226,183 +101,287 @@ def parse_expense_form(form, user_id):
 
     return {
         "amount": format(amount, "f") if amount is not None else amount_text,
-        "category_id": category_id or category_choice,
-        "category_name": category_name,
-        "new_category": new_category,
-        "subcategory_id": subcategory_id or subcategory_choice,
-        "subcategory_name": subcategory_name,
-        "new_subcategory": new_subcategory,
-        "expense_type": expense_type or "Liability",
+        "category": category,
         "expense_date": expense_date,
         "description": description,
     }, errors
 
 
-def get_or_create_category(connection, user_id, category_name):
-    category_name = normalize_category_name(category_name)
-    normalized_name = category_name.casefold()
-    connection.execute(
-        "INSERT INTO categories (user_id, name, normalized_name) VALUES (?, ?, ?) "
-        "ON CONFLICT(user_id, normalized_name) DO NOTHING",
-        (user_id, category_name, normalized_name),
-    )
-    return connection.execute(
-        "SELECT id, name FROM categories WHERE user_id = ? AND normalized_name = ?",
-        (user_id, normalized_name),
-    ).fetchone()
+def expense_form_values(form=None):
+    form = form or {}
+    return {
+        "amount": form.get("amount", "").strip(),
+        "category_id": form.get("category_id", "").strip(),
+        "new_category": form.get("new_category", "").strip(),
+        "subcategory_id": form.get("subcategory_id", "").strip(),
+        "new_subcategory": form.get("new_subcategory", "").strip(),
+        "expense_type": form.get("expense_type", "Liability").strip(),
+        "expense_date": form.get("expense_date", date.today().isoformat()).strip(),
+        "description": form.get("description", "").strip(),
+    }
 
 
-def get_or_create_subcategory(connection, category_id, subcategory_name):
-    subcategory_name = normalize_category_name(subcategory_name)
-    normalized_name = subcategory_name.casefold()
-    connection.execute(
-        "INSERT INTO subcategories (category_id, name, normalized_name) VALUES (?, ?, ?) "
-        "ON CONFLICT(category_id, normalized_name) DO NOTHING",
-        (category_id, subcategory_name, normalized_name),
-    )
-    return connection.execute(
-        "SELECT id, name FROM subcategories WHERE category_id = ? AND normalized_name = ?",
-        (category_id, normalized_name),
-    ).fetchone()
+def get_user_categories(user_id):
+    seed_default_categories(user_id)
+    with database_connection() as connection:
+        category_rows = connection.execute(
+            "SELECT id, name FROM categories WHERE user_id = ? ORDER BY name COLLATE NOCASE",
+            (user_id,),
+        ).fetchall()
+        categories = []
+        for category in category_rows:
+            subcategories = connection.execute(
+                "SELECT id, name FROM subcategories WHERE category_id = ? ORDER BY name COLLATE NOCASE",
+                (category["id"],),
+            ).fetchall()
+            categories.append({
+                "id": category["id"],
+                "name": category["name"],
+                "subcategories": [dict(row) for row in subcategories],
+            })
+    return categories
 
 
-def save_expense(connection, user_id, values, expense_id=None):
-    category = (
-        connection.execute(
-            "SELECT id, name FROM categories WHERE id = ? AND user_id = ?",
-            (int(values["category_id"]), user_id),
-        ).fetchone()
-        if values["category_id"] and values["category_id"] != "__new__"
-        else get_or_create_category(connection, user_id, values["category_name"])
-    )
-    if category is None:
-        raise ValueError("Choose a valid category.")
+def validate_expense_values(values, user_id):
+    errors = []
+    if not values["amount"]:
+        errors.append("Enter an amount.")
+    else:
+        try:
+            amount = Decimal(values["amount"])
+            if not amount.is_finite() or amount <= 0:
+                errors.append("Amount must be greater than zero.")
+            elif amount.as_tuple().exponent < -2:
+                errors.append("Amount must use no more than two decimal places.")
+            else:
+                values["amount"] = format(amount, ".2f")
+        except InvalidOperation:
+            errors.append("Enter a valid amount, such as 32.12.")
 
-    if values["subcategory_id"] == "__new__" and values["new_subcategory"]:
-        subcategory = get_or_create_subcategory(connection, category["id"], values["new_subcategory"])
-        subcategory_id = subcategory["id"]
-        subcategory_name = subcategory["name"]
+    try:
+        parsed_date = date.fromisoformat(values["expense_date"])
+        if parsed_date.isoformat() != values["expense_date"]:
+            raise ValueError
+    except ValueError:
+        errors.append("Enter a valid expense date.")
+
+    if values["expense_type"] not in ("Liability", "Savings"):
+        errors.append("Choose Liability or Savings for the expense type.")
+
+    category = None
+    if values["category_id"] == "__new__":
+        values["new_category"] = normalize_category_name(values["new_category"])
+        if not values["new_category"]:
+            errors.append("Enter a category name.")
+    else:
+        try:
+            category_id = int(values["category_id"])
+        except ValueError:
+            category_id = None
+        if category_id is None:
+            errors.append("Choose a category.")
+        else:
+            with database_connection() as connection:
+                category = connection.execute(
+                    "SELECT id, name FROM categories WHERE id = ? AND user_id = ?",
+                    (category_id, user_id),
+                ).fetchone()
+            if category is None:
+                errors.append("Choose a category belonging to your account.")
+
+    if values["subcategory_id"] == "__new__":
+        values["new_subcategory"] = normalize_category_name(values["new_subcategory"])
+        if not values["new_subcategory"]:
+            errors.append("Enter a subcategory name.")
     elif values["subcategory_id"]:
-        subcategory = connection.execute(
-            "SELECT id, name FROM subcategories WHERE id = ? AND category_id = ?",
-            (int(values["subcategory_id"]), category["id"]),
-        ).fetchone()
-        if subcategory is None:
-            raise ValueError("Choose a subcategory belonging to the selected category.")
-        subcategory_id = subcategory["id"]
-        subcategory_name = subcategory["name"]
-    else:
-        subcategory_id = None
-        subcategory_name = ""
+        try:
+            subcategory_id = int(values["subcategory_id"])
+        except ValueError:
+            subcategory_id = None
+        if category is None or subcategory_id is None:
+            errors.append("Choose a subcategory belonging to the selected category.")
+        else:
+            with database_connection() as connection:
+                subcategory = connection.execute(
+                    "SELECT id FROM subcategories WHERE id = ? AND category_id = ?",
+                    (subcategory_id, category["id"]),
+                ).fetchone()
+            if subcategory is None:
+                errors.append("Choose a subcategory belonging to the selected category.")
 
-    if expense_id is None:
+    return values, errors
+
+
+def save_expense_record(user_id, values, expense_id=None):
+    with database_connection() as connection:
+        if values["category_id"] == "__new__":
+            category_name = normalize_category_name(values["new_category"])
+            normalized_category = category_name.casefold()
+            connection.execute(
+                "INSERT INTO categories (user_id, name, normalized_name) VALUES (?, ?, ?) "
+                "ON CONFLICT(user_id, normalized_name) DO NOTHING",
+                (user_id, category_name, normalized_category),
+            )
+            category = connection.execute(
+                "SELECT id, name FROM categories WHERE user_id = ? AND normalized_name = ?",
+                (user_id, normalized_category),
+            ).fetchone()
+        else:
+            category = connection.execute(
+                "SELECT id, name FROM categories WHERE id = ? AND user_id = ?",
+                (int(values["category_id"]), user_id),
+            ).fetchone()
+
+        subcategory_id = None
+        if values["subcategory_id"] == "__new__":
+            subcategory_name = normalize_category_name(values["new_subcategory"])
+            normalized_subcategory = subcategory_name.casefold()
+            connection.execute(
+                "INSERT INTO subcategories (category_id, name, normalized_name) VALUES (?, ?, ?) "
+                "ON CONFLICT(category_id, normalized_name) DO NOTHING",
+                (category["id"], subcategory_name, normalized_subcategory),
+            )
+            subcategory_id = connection.execute(
+                "SELECT id FROM subcategories WHERE category_id = ? AND normalized_name = ?",
+                (category["id"], normalized_subcategory),
+            ).fetchone()["id"]
+        elif values["subcategory_id"]:
+            subcategory_id = int(values["subcategory_id"])
+
+        if expense_id is None:
+            connection.execute(
+                "INSERT INTO expenses (user_id, amount, category, expense_date, description, category_id, subcategory_id, expense_type) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (user_id, values["amount"], category["name"], values["expense_date"], values["description"], category["id"], subcategory_id, values["expense_type"]),
+            )
+        else:
+            connection.execute(
+                "UPDATE expenses SET amount = ?, category = ?, expense_date = ?, description = ?, "
+                "category_id = ?, subcategory_id = ?, expense_type = ? WHERE id = ? AND user_id = ?",
+                (values["amount"], category["name"], values["expense_date"], values["description"], category["id"], subcategory_id, values["expense_type"], expense_id, user_id),
+            )
+
+
+@app.post("/categories/<int:category_id>/subcategories")
+@login_required
+def add_subcategory(category_id):
+    submitted_token = request.headers.get("X-CSRF-Token", "")
+    saved_token = session.get("csrf_token", "")
+    if not saved_token or not hmac.compare_digest(submitted_token, saved_token):
+        abort(400)
+
+    data = request.get_json(silent=True) or {}
+    name = normalize_category_name(data.get("name", ""))
+    if not name:
+        return jsonify(error="Enter a subcategory name."), 400
+
+    with database_connection() as connection:
+        category = connection.execute(
+            "SELECT id FROM categories WHERE id = ? AND user_id = ?",
+            (category_id, session["user_id"]),
+        ).fetchone()
+        if category is None:
+            abort(404)
+
+        normalized_name = name.casefold()
         connection.execute(
-            "INSERT INTO expenses "
-            "(user_id, amount, category, expense_date, description, category_id, subcategory_id, expense_type) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                user_id,
-                values["amount"],
-                category["name"],
-                values["expense_date"],
-                values["description"],
-                category["id"],
-                subcategory_id,
-                values["expense_type"],
-            ),
+            "INSERT INTO subcategories (category_id, name, normalized_name) VALUES (?, ?, ?) "
+            "ON CONFLICT(category_id, normalized_name) DO NOTHING",
+            (category_id, name, normalized_name),
         )
-    else:
-        connection.execute(
-            "UPDATE expenses SET amount = ?, category = ?, expense_date = ?, description = ?, "
-            "category_id = ?, subcategory_id = ?, expense_type = ? "
-            "WHERE id = ? AND user_id = ?",
-            (
-                values["amount"],
-                category["name"],
-                values["expense_date"],
-                values["description"],
-                category["id"],
-                subcategory_id,
-                values["expense_type"],
-                expense_id,
-                user_id,
-            ),
-        )
+        subcategory = connection.execute(
+            "SELECT id, name FROM subcategories WHERE category_id = ? AND normalized_name = ?",
+            (category_id, normalized_name),
+        ).fetchone()
+    return jsonify(id=subcategory["id"], name=subcategory["name"])
 
 
 def get_category_analytics(user_id, target_month):
-    if not target_month:
-        target_month = date.today().strftime("%Y-%m")
-
-    try:
-        year, month = (int(part) for part in target_month.split("-"))
-        if month < 1 or month > 12:
-            raise ValueError
-        date(year, month, 1)
-    except (ValueError, TypeError):
-        target_month = date.today().strftime("%Y-%m")
+    target_month = parse_month_period(target_month)
+    year, month = (int(part) for part in target_month.split("-"))
+    month_start = date(year, month, 1)
+    month_end = date(year + (month == 12), 1 if month == 12 else month + 1, 1)
 
     with database_connection() as connection:
         rows = connection.execute(
             """
-            SELECT category, SUM(CAST(amount AS REAL)) AS total
-            FROM expenses
-            WHERE user_id = ? AND substr(expense_date, 1, 7) = ?
-            GROUP BY category
-            ORDER BY total DESC, category COLLATE NOCASE ASC
+            SELECT e.category_id, c.name AS category, s.name AS subcategory, e.amount
+            FROM expenses e
+            JOIN categories c ON c.id = e.category_id AND c.user_id = e.user_id
+            LEFT JOIN subcategories s ON s.id = e.subcategory_id AND s.category_id = c.id
+            WHERE e.user_id = ? AND e.expense_date >= ? AND e.expense_date < ?
+            ORDER BY c.name COLLATE NOCASE, s.name COLLATE NOCASE
             """,
-            (user_id, target_month),
+            (user_id, month_start.isoformat(), month_end.isoformat()),
         ).fetchall()
 
-    analytics = []
+    categories = {}
     month_total = Decimal("0")
     for row in rows:
-        row_total = Decimal(str(row["total"]))
-        month_total += row_total
-        analytics.append({
-            "category": row["category"],
-            "total": row_total,
-        })
+        amount = Decimal(row["amount"])
+        month_total += amount
+        category = categories.setdefault(
+            row["category_id"],
+            {"id": row["category_id"], "category": row["category"], "total": Decimal("0"), "subcategories": {}},
+        )
+        category["total"] += amount
+        subcategory_name = row["subcategory"] or "No subcategory"
+        subcategory = category["subcategories"].setdefault(
+            subcategory_name,
+            {"subcategory": subcategory_name, "total": Decimal("0")},
+        )
+        subcategory["total"] += amount
 
-    if analytics:
-        for item in analytics:
-            item["percentage"] = (item["total"] / month_total * Decimal("100")) if month_total > 0 else Decimal("0")
-    else:
-        for item in analytics:
-            item["percentage"] = Decimal("0")
-
-    highest_category = None
-    lowest_category = None
-    if analytics:
-        highest_category = max(analytics, key=lambda item: item["total"])
-        lowest_category = min(analytics, key=lambda item: item["total"])
+    analytics = list(categories.values())
+    for item in analytics:
+        item["percentage"] = item["total"] / month_total * Decimal("100") if month_total else Decimal("0")
+        item["subcategories"] = sorted(
+            item["subcategories"].values(), key=lambda entry: (-entry["total"], entry["subcategory"].casefold())
+        )
+        for subcategory in item["subcategories"]:
+            subcategory["percentage"] = (
+                subcategory["total"] / item["total"] * Decimal("100") if item["total"] else Decimal("0")
+            )
+    analytics.sort(key=lambda item: (-item["total"], item["category"].casefold()))
 
     return {
         "month": target_month,
         "items": analytics,
         "total": month_total,
-        "highest_category": highest_category,
-        "lowest_category": lowest_category,
+        "highest_category": analytics[0] if analytics else None,
+        "lowest_category": analytics[-1] if analytics else None,
     }
+
+
+def parse_month_period(period):
+    try:
+        year, month = (int(part) for part in (period or "").split("-"))
+        selected = date(year, month, 1)
+    except (ValueError, TypeError):
+        selected = date.today().replace(day=1)
+    return selected.strftime("%Y-%m")
 
 
 def get_budget_summary(user_id, month=None, year=None):
     selected_month = int(month) if month is not None else date.today().month
     selected_year = int(year) if year is not None else date.today().year
+    month_start = date(selected_year, selected_month, 1)
+    month_end = date(selected_year + (selected_month == 12), 1 if selected_month == 12 else selected_month + 1, 1)
 
     with database_connection() as connection:
         budget = connection.execute(
             "SELECT id, budget_amount FROM budgets WHERE user_id = ? AND month = ? AND year = ?",
             (user_id, selected_month, selected_year),
         ).fetchone()
-        total_spent_row = connection.execute(
-            "SELECT COALESCE(SUM(CAST(amount AS REAL)), 0) AS total_spent FROM expenses "
-            "WHERE user_id = ? AND CAST(strftime('%Y', expense_date) AS INTEGER) = ? "
-            "AND CAST(strftime('%m', expense_date) AS INTEGER) = ?",
-            (user_id, selected_year, selected_month),
-        ).fetchone()
+        expense_rows = connection.execute(
+            "SELECT expense_type, amount FROM expenses "
+            "WHERE user_id = ? AND expense_date >= ? AND expense_date < ?",
+            (user_id, month_start.isoformat(), month_end.isoformat()),
+        ).fetchall()
 
-    spent = Decimal(str(total_spent_row["total_spent"])) if total_spent_row and total_spent_row["total_spent"] is not None else Decimal("0")
+    liability_total = sum((Decimal(row["amount"]) for row in expense_rows if row["expense_type"] == "Liability"), Decimal("0"))
+    savings_total = sum((Decimal(row["amount"]) for row in expense_rows if row["expense_type"] == "Savings"), Decimal("0"))
+    spent = liability_total + savings_total
     budget_amount = Decimal(str(budget["budget_amount"])) if budget else None
 
     if budget_amount is None:
@@ -411,15 +390,22 @@ def get_budget_summary(user_id, month=None, year=None):
             "year": selected_year,
             "budget_amount": None,
             "total_spent": spent,
+            "liability_total": liability_total,
+            "savings_total": savings_total,
             "remaining": None,
             "utilization": Decimal("0"),
             "status": "not_set",
             "status_label": "No budget set",
             "message": "Set a monthly budget to track your spending.",
+            "liability_chart_end": Decimal("0"),
+            "expenditure_chart_end": Decimal("0"),
         }
 
     remaining = budget_amount - spent
     utilization = (spent / budget_amount * Decimal("100")) if budget_amount else Decimal("0")
+    chart_scale = max(budget_amount, spent)
+    liability_chart_end = liability_total / chart_scale * Decimal("100") if chart_scale else Decimal("0")
+    expenditure_chart_end = spent / chart_scale * Decimal("100") if chart_scale else Decimal("0")
 
     if spent > budget_amount:
         status = "exceeded"
@@ -439,11 +425,15 @@ def get_budget_summary(user_id, month=None, year=None):
         "year": selected_year,
         "budget_amount": budget_amount,
         "total_spent": spent,
+        "liability_total": liability_total,
+        "savings_total": savings_total,
         "remaining": remaining,
         "utilization": utilization,
         "status": status,
         "status_label": status_label,
         "message": message,
+        "liability_chart_end": liability_chart_end,
+        "expenditure_chart_end": expenditure_chart_end,
     }
 
 
@@ -526,9 +516,24 @@ def logout():
 @app.get("/dashboard")
 @login_required
 def dashboard():
+    period = parse_month_period(request.args.get("period"))
+    selected_year, selected_month = (int(part) for part in period.split("-"))
+    budget = get_budget_summary(session["user_id"], selected_month, selected_year)
+    return render_template(
+        "dashboard.html",
+        budget=budget,
+        period=period,
+        period_label=date(selected_year, selected_month, 1).strftime("%B %Y"),
+        selected_month=selected_month,
+        selected_year=selected_year,
+    )
+
+
+@app.get("/expenses")
+@login_required
+def expenses():
     category_filter = request.args.get("category", "").strip()
     date_filter = request.args.get("date", "").strip()
-    analytics_month = request.args.get("analytics_month", date.today().strftime("%Y-%m")).strip()
     if date_filter:
         try:
             parsed_date = date.fromisoformat(date_filter)
@@ -538,54 +543,38 @@ def dashboard():
             flash("Choose a valid date to filter expenses.", "error")
             date_filter = ""
 
-    try:
-        year, month = (int(part) for part in analytics_month.split("-"))
-        if month < 1 or month > 12:
-            raise ValueError
-        date(year, month, 1)
-    except (ValueError, TypeError):
-        flash("Choose a valid month for category analytics.", "error")
-        analytics_month = date.today().strftime("%Y-%m")
-
-    try:
-        selected_month = int(request.args.get("month", date.today().month))
-        selected_year = int(request.args.get("year", date.today().year))
-        if selected_month < 1 or selected_month > 12:
-            raise ValueError
-        date(selected_year, selected_month, 1)
-    except (ValueError, TypeError):
-        flash("Choose a valid month and year for budget tracking.", "error")
-        selected_month = date.today().month
-        selected_year = date.today().year
-
-    categories = get_user_categories(session["user_id"])
-    valid_category_ids = {str(category["id"]) for category in categories}
-    if category_filter and category_filter not in valid_category_ids:
-        flash("Choose a valid category filter.", "error")
-        category_filter = ""
-
     conditions = ["e.user_id = ?"]
     values = [session["user_id"]]
     if category_filter:
-        conditions.append("e.category_id = ?")
-        values.append(category_filter)
+        try:
+            category_id = int(category_filter)
+        except ValueError:
+            category_id = None
+        if category_id is None:
+            flash("Choose a valid category to filter expenses.", "error")
+            category_filter = ""
+        else:
+            conditions.append("e.category_id = ?")
+            values.append(category_id)
     if date_filter:
         conditions.append("e.expense_date = ?")
         values.append(date_filter)
 
     with database_connection() as connection:
         expenses = connection.execute(
-            "SELECT e.id, e.amount, e.category, e.category_id, e.subcategory_id, "
-            "COALESCE(s.name, '') AS subcategory, e.expense_date, e.description, e.expense_type "
-            "FROM expenses e LEFT JOIN subcategories s ON s.id = e.subcategory_id "
-            f"WHERE {' AND '.join(conditions)} "
-            "ORDER BY e.expense_date DESC, e.id DESC",
+            "SELECT e.id, e.amount, COALESCE(c.name, e.category) AS category, "
+            "s.name AS subcategory, e.expense_type, e.expense_date, e.description "
+            "FROM expenses e LEFT JOIN categories c ON c.id = e.category_id AND c.user_id = e.user_id "
+            "LEFT JOIN subcategories s ON s.id = e.subcategory_id AND s.category_id = c.id "
+            f"WHERE {' AND '.join(conditions)} ORDER BY e.expense_date DESC, e.id DESC",
             values,
+        ).fetchall()
+        categories = connection.execute(
+            "SELECT id, name FROM categories WHERE user_id = ? ORDER BY name COLLATE NOCASE",
+            (session["user_id"],),
         ).fetchall()
 
     total = sum((Decimal(expense["amount"]) for expense in expenses), Decimal("0"))
-    analytics = get_category_analytics(session["user_id"], analytics_month)
-    budget = get_budget_summary(session["user_id"], selected_month, selected_year)
     return render_template(
         "view_expenses.html",
         expenses=expenses,
@@ -593,13 +582,43 @@ def dashboard():
         category_filter=category_filter,
         date_filter=date_filter,
         total=total,
-        analytics_month=analytics["month"],
-        analytics_items=analytics["items"],
-        highest_category=analytics["highest_category"],
-        lowest_category=analytics["lowest_category"],
+    )
+
+
+@app.get("/budget")
+@login_required
+def budget_page():
+    period = parse_month_period(request.args.get("period"))
+    selected_year, selected_month = (int(part) for part in period.split("-"))
+    budget = get_budget_summary(session["user_id"], selected_month, selected_year)
+    return render_template(
+        "budget.html",
         budget=budget,
+        period=period,
+        period_label=date(selected_year, selected_month, 1).strftime("%B %Y"),
         selected_month=selected_month,
         selected_year=selected_year,
+    )
+
+
+@app.get("/analytics")
+@login_required
+def analytics_page():
+    period = parse_month_period(request.args.get("period"))
+    analytics = get_category_analytics(session["user_id"], period)
+    selected_category_id = request.args.get("category_id", type=int)
+    selected_category = next(
+        (item for item in analytics["items"] if item["id"] == selected_category_id), None
+    )
+    return render_template(
+        "analytics.html",
+        period=analytics["month"],
+        period_label=date(*(int(part) for part in analytics["month"].split("-")), 1).strftime("%B %Y"),
+        analytics_items=analytics["items"],
+        analytics_total=analytics["total"],
+        highest_category=analytics["highest_category"],
+        lowest_category=analytics["lowest_category"],
+        selected_category=selected_category,
     )
 
 
@@ -607,15 +626,24 @@ def dashboard():
 @login_required
 def save_budget():
     try:
-        month = int(request.form.get("month", ""))
-        year = int(request.form.get("year", ""))
+        period = request.form.get("period", "").strip()
+        if period:
+            parsed_period = parse_month_period(period)
+            if parsed_period != period:
+                raise ValueError
+            period = parsed_period
+            year, month = (int(part) for part in period.split("-"))
+        else:
+            month = int(request.form.get("month", ""))
+            year = int(request.form.get("year", ""))
+            period = date(year, month, 1).strftime("%Y-%m")
         amount = Decimal(request.form.get("budget_amount", "").strip())
         date(year, month, 1)
-        if not amount.is_finite() or amount <= 0:
+        if not amount.is_finite() or amount <= 0 or amount.as_tuple().exponent < -2:
             raise ValueError
     except (InvalidOperation, ValueError, TypeError):
-        flash("Enter a valid month, year, and budget amount greater than zero.", "error")
-        return redirect(url_for("dashboard"))
+        flash("Enter a valid month, year, and budget amount with no more than two decimal places.", "error")
+        return redirect(url_for("budget_page"))
 
     with database_connection() as connection:
         connection.execute(
@@ -626,55 +654,25 @@ def save_budget():
         )
 
     flash("Monthly budget saved.", "success")
-    return redirect(url_for("dashboard", month=month, year=year))
-
-
-@app.post("/categories/<int:category_id>/subcategories")
-@login_required
-def add_subcategory(category_id):
-    payload = request.get_json(silent=True) or {}
-    subcategory_name = normalize_category_name(payload.get("name", ""))
-    if not subcategory_name:
-        return jsonify(error="Enter a subcategory name."), 400
-
-    with database_connection() as connection:
-        category = connection.execute(
-            "SELECT id FROM categories WHERE id = ? AND user_id = ?",
-            (category_id, session["user_id"]),
-        ).fetchone()
-        if category is None:
-            abort(404)
-
-        subcategory = get_or_create_subcategory(connection, category_id, subcategory_name)
-
-    return jsonify(id=subcategory["id"], name=subcategory["name"])
+    return redirect(url_for("budget_page", period=period))
 
 
 @app.route("/expenses/add", methods=["GET", "POST"])
 @login_required
 def add_expense():
-    values = {
-        "amount": "",
-        "category_id": "",
-        "new_category": "",
-        "subcategory_id": "",
-        "new_subcategory": "",
-        "expense_type": "Liability",
-        "expense_date": date.today().isoformat(),
-        "description": "",
-    }
     categories = get_user_categories(session["user_id"])
+    values = expense_form_values()
     if request.method == "POST":
-        values, errors = parse_expense_form(request.form, session["user_id"])
+        values = expense_form_values(request.form)
+        values, errors = validate_expense_values(values, session["user_id"])
         if errors:
             for error in errors:
                 flash(error, "error")
             return render_template("add_expense.html", expense=values, categories=categories), 400
 
-        with database_connection() as connection:
-            save_expense(connection, session["user_id"], values)
+        save_expense_record(session["user_id"], values)
         flash("Expense saved.", "success")
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("expenses"))
 
     return render_template("add_expense.html", expense=values, categories=categories)
 
@@ -684,31 +682,30 @@ def add_expense():
 def edit_expense(expense_id):
     categories = get_user_categories(session["user_id"])
     with database_connection() as connection:
-        expense = connection.execute(
-            "SELECT id, amount, category, category_id, subcategory_id, expense_type, "
-            "expense_date, description FROM expenses WHERE id = ? AND user_id = ?",
+        expense_row = connection.execute(
+            "SELECT id, amount, category_id, subcategory_id, expense_type, expense_date, description "
+            "FROM expenses WHERE id = ? AND user_id = ?",
             (expense_id, session["user_id"]),
         ).fetchone()
-        if expense is None:
-            abort(404)
+    if expense_row is None:
+        abort(404)
 
-        if request.method == "POST":
-            values, errors = parse_expense_form(request.form, session["user_id"])
-            if errors:
-                for error in errors:
-                    flash(error, "error")
-                return render_template(
-                    "edit_expense.html",
-                    expense={**dict(expense), **values},
-                    categories=categories,
-                ), 400
-
-            save_expense(connection, session["user_id"], values, expense_id)
+    saved_expense = dict(expense_row)
+    saved_expense["category_id"] = str(saved_expense["category_id"])
+    saved_expense["subcategory_id"] = str(saved_expense["subcategory_id"] or "")
+    if request.method == "POST":
+        values = expense_form_values(request.form)
+        values, errors = validate_expense_values(values, session["user_id"])
+        if errors:
+            for error in errors:
+                flash(error, "error")
+            return render_template("edit_expense.html", expense=values, categories=categories), 400
+        save_expense_record(session["user_id"], values, expense_id=expense_id)
 
     if request.method == "POST":
         flash("Expense updated.", "success")
-        return redirect(url_for("dashboard"))
-    return render_template("edit_expense.html", expense=expense, categories=categories)
+        return redirect(url_for("expenses"))
+    return render_template("edit_expense.html", expense=saved_expense, categories=categories)
 
 
 @app.post("/expenses/<int:expense_id>/delete")
@@ -720,7 +717,7 @@ def delete_expense(expense_id):
             (expense_id, session["user_id"]),
         )
     flash("Expense deleted.", "success")
-    return redirect(url_for("dashboard"))
+    return redirect(url_for("expenses"))
 
 
 initialize_database()
