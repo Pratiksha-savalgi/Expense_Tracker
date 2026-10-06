@@ -1,8 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Add expense{% endblock %}
 {% block content %}
+<<<<<<< HEAD
 <div class="content-narrow add-expense-page">
   <a class="back-link" href="{{ url_for('expenses_page') }}"><span aria-hidden="true">←</span> All expenses</a>
+=======
+<div class="content-narrow">
+  <a class="back-link" href="{{ url_for('expenses') }}"><span aria-hidden="true">←</span> All expenses</a>
+>>>>>>> d6b40453c92a130e5b5b7944ca268733689bb73c
   <section class="form-page-heading">
     <p class="eyebrow">Expense record</p>
     <h1>Add an expense</h1>
@@ -53,7 +58,12 @@
       </div>
     </div>
     <div class="form-actions">
+<<<<<<< HEAD
       <button class="button button-primary" type="submit">Save expense</button>
+=======
+      <a class="button button-quiet" href="{{ url_for('expenses') }}">Cancel</a>
+      <button class="button button-primary" type="submit">Save expense <span aria-hidden="true">→</span></button>
+>>>>>>> d6b40453c92a130e5b5b7944ca268733689bb73c
     </div>
   </form>
 </div>

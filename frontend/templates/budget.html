@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Monthly budget{% endblock %}
+{% block content %}
+<section class="dashboard-heading">
+  <div>
+    <p class="eyebrow">Plan and review</p>
+    <h1>Monthly budget<span class="heading-period">.</span></h1>
+    <p class="page-lede">Set a monthly limit and see how your expenses compare.</p>
+  </div>
+  <a class="button button-outline" href="{{ url_for('dashboard', period=period) }}">Back to dashboard</a>
+</section>
+
+<form class="period-switcher" method="get" action="{{ url_for('budget_page') }}">
+  <label for="budget-view-period">Budget period</label>
+  <input id="budget-view-period" name="period" type="month" value="{{ period }}">
+  <button class="button button-outline" type="submit">Show month</button>
+</form>
+
+<section class="budget-panel" aria-labelledby="budget-panel-title">
+  <div class="budget-header">
+    <div>
+      <p class="eyebrow">{{ period_label }}</p>
+      <h2 id="budget-panel-title">Budget status</h2>
+    </div>
+    <span class="budget-status budget-status-{{ budget.status }}">{{ budget.status_label }}</span>
+  </div>
+
+  <div class="budget-grid">
+    <div class="budget-card"><span class="budget-label">Budget</span><strong>{% if budget.budget_amount is not none %}{{ format_money(budget.budget_amount) }}{% else %}Not set{% endif %}</strong></div>
+    <div class="budget-card"><span class="budget-label">Spent</span><strong>{{ format_money(budget.total_spent) }}</strong></div>
+    <div class="budget-card"><span class="budget-label">Remaining</span><strong>{% if budget.remaining is not none %}{{ format_money(budget.remaining) }}{% else %}Not available{% endif %}</strong></div>
+    <div class="budget-card"><span class="budget-label">Utilization</span><strong>{% if budget.budget_amount is not none %}{{ '%.1f'|format(budget.utilization) }}%{% else %}Not available{% endif %}</strong></div>
+  </div>
+  <p class="budget-note">{{ budget.message }} Liability and Savings entries both count toward expenditure.</p>
+
+  <form class="budget-form" method="post" action="{{ url_for('save_budget') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="budget-fields">
+      <div class="filter-field budget-amount-field">
+        <label for="budget-period">Month and year</label>
+        <input id="budget-period" name="period" type="month" value="{{ period }}" required>
+      </div>
+      <div class="filter-field budget-amount-field">
+        <label for="budget-amount">Budget amount</label>
+        <input id="budget-amount" name="budget_amount" type="number" min="0.01" step="0.01" placeholder="25000.00" value="{{ budget.budget_amount if budget.budget_amount is not none else '' }}" required>
+      </div>
+      <button class="button button-primary" type="submit">Save budget</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

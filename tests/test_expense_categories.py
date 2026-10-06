@@ -98,7 +98,16 @@ class ExpenseCategoryTestCase(unittest.TestCase):
         self.assertEqual(expense["category"], "Food")
         self.assertEqual(expense["category_name"], "Food")
 
+<<<<<<< HEAD
     def test_new_user_sees_default_categories(self):
+=======
+        expense_list = self.client.get("/expenses").get_data(as_text=True)
+        self.assertIn("Food", expense_list)
+        self.assertIn("Dinner", expense_list)
+        self.assertIn("Savings", expense_list)
+
+    def test_new_user_sees_default_categories_and_custom_add_options(self):
+>>>>>>> d6b40453c92a130e5b5b7944ca268733689bb73c
         body = self.client.get("/expenses/add").get_data(as_text=True)
         self.assertIn(">Food</option>", body)
         self.assertIn(">Transport</option>", body)
@@ -241,7 +250,7 @@ class ExpenseCategoryTestCase(unittest.TestCase):
                 body = response.get_data(as_text=True)
                 self.assertEqual(response.status_code, 400)
                 self.assertIn(expected_message, body)
-                self.assertIn("selected>Food</option>", body)
+                self.assertIn('id="new_category" name="new_category" type="text" value="Food"', body)
                 with database_connection() as connection:
                     count = connection.execute("SELECT COUNT(*) FROM expenses").fetchone()[0]
                     category_count = connection.execute("SELECT COUNT(*) FROM categories").fetchone()[0]
@@ -276,9 +285,13 @@ class ExpenseCategoryTestCase(unittest.TestCase):
             )
         )
 
+<<<<<<< HEAD
         response = self.client.get(
             f"/expenses/add?category={food_id}&date_period=custom&date={today}"
         )
+=======
+        response = self.client.get(f"/expenses?category={food_id}&date={today}")
+>>>>>>> d6b40453c92a130e5b5b7944ca268733689bb73c
         body = response.get_data(as_text=True)
         self.assertEqual(response.status_code, 200)
         self.assertIn('class="entry-form add-expense-form"', body)
