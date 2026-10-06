@@ -83,11 +83,12 @@ class BudgetTrackingTestCase(unittest.TestCase):
 
     def test_monthly_budget_status_is_shown_on_dashboard(self):
         self._register_and_login()
+        today = date.today()
 
         csrf = self._csrf_token_for("/dashboard")
         self.client.post(
             "/budget",
-            data={"month": "9", "year": "2026", "budget_amount": "10000", "csrf_token": csrf},
+            data={"month": str(today.month), "year": str(today.year), "budget_amount": "10000", "csrf_token": csrf},
             follow_redirects=False,
         )
 
@@ -97,19 +98,22 @@ class BudgetTrackingTestCase(unittest.TestCase):
             data={
                 "amount": "2500",
                 "category": "Food",
-                "expense_date": "2026-09-12",
+                "expense_date": today.isoformat(),
                 "description": "Lunch",
                 "csrf_token": csrf,
             },
             follow_redirects=False,
         )
 
-        response = self.client.get("/dashboard?month=9&year=2026")
+        response = self.client.get("/dashboard")
         self.assertEqual(response.status_code, 200)
         body = response.get_data(as_text=True)
         self.assertIn("Monthly budget", body)
-        self.assertIn("Remaining", body)
-        self.assertIn("Utilization", body)
+        self.assertIn("Current Month Expenses", body)
+        self.assertIn("₹10,000.00", body)
+        self.assertIn("₹2,500.00", body)
+        self.assertIn("₹7,500.00", body)
+        self.assertIn("25.0%", body)
 
 
 if __name__ == "__main__":

@@ -33,18 +33,134 @@ if (registrationForm) {
   confirmationInput.addEventListener("input", validatePasswordMatch);
 }
 
+const expenseModal = document.querySelector("[data-expense-modal]");
+if (expenseModal) {
+  const modalForm = expenseModal.querySelector("[data-modal-expense-form]");
+  const categorySelect = expenseModal.querySelector("[data-modal-category]");
+  const newCategoryField = expenseModal.querySelector("[data-modal-new-category-field]");
+  const newCategoryInput = newCategoryField.querySelector("input");
+  const modalDatePicker = expenseModal.querySelector("[data-modal-date-picker]");
+  const modalDatePeriodButtons = expenseModal.querySelectorAll("[data-modal-date-period]");
+  const successMessage = expenseModal.querySelector("[data-expense-save-success]");
+  const saveConfirmation = expenseModal.querySelector("[data-confirm-expense-save]");
+
+  const toIsoDate = (value) => {
+    const localDate = new Date(value.getTime() - (value.getTimezoneOffset() * 60000));
+    return localDate.toISOString().split("T")[0];
+  };
+  const todayIso = () => toIsoDate(new Date());
+  const yesterdayIso = () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return toIsoDate(yesterday);
+  };
+  const setActiveDatePeriod = (period) => {
+    modalDatePeriodButtons.forEach((button) => {
+      const isActive = button.dataset.modalDatePeriod === period;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", String(isActive));
+    });
+    modalDatePicker.closest(".date-picker-option").classList.toggle("is-active", period === "custom");
+  };
+  const syncActiveDatePeriod = () => {
+    const selectedDate = modalDatePicker.value;
+    const today = todayIso();
+    if (selectedDate === today) {
+      setActiveDatePeriod("today");
+    } else if (selectedDate === yesterdayIso()) {
+      setActiveDatePeriod("yesterday");
+    } else {
+      const lastSevenDays = new Date();
+      lastSevenDays.setDate(lastSevenDays.getDate() - 6);
+      setActiveDatePeriod(selectedDate >= toIsoDate(lastSevenDays) && selectedDate <= today ? "last7" : "custom");
+    }
+  };
+  const updateNewCategoryField = () => {
+    const addingCategory = categorySelect.value === "__new__";
+    newCategoryField.hidden = !addingCategory;
+    newCategoryInput.required = addingCategory;
+    if (!addingCategory) newCategoryInput.value = "";
+  };
+
+  categorySelect.addEventListener("change", updateNewCategoryField);
+  modalDatePicker.max = todayIso();
+  modalDatePeriodButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const period = button.dataset.modalDatePeriod;
+      modalDatePicker.value = period === "yesterday" ? yesterdayIso() : todayIso();
+      setActiveDatePeriod(period);
+    });
+  });
+  modalDatePicker.addEventListener("change", () => setActiveDatePeriod("custom"));
+  setActiveDatePeriod("today");
+  updateNewCategoryField();
+
+  modalForm.addEventListener("submit", (event) => {
+    const amountInput = modalForm.querySelector("#modal-amount");
+    if (!amountInput.value) {
+      amountInput.setCustomValidity("Enter an amount.");
+    } else if (Number(amountInput.value) <= 0) {
+      amountInput.setCustomValidity("Amount must be greater than zero.");
+    } else if (amountInput.validity.stepMismatch) {
+      amountInput.setCustomValidity("Amount must use no more than two decimal places.");
+    } else {
+      amountInput.setCustomValidity("");
+    }
+
+    if (!modalForm.reportValidity()) event.preventDefault();
+  });
+
+  expenseModal.addEventListener("cancel", (event) => event.preventDefault());
+  if (expenseModal.dataset.autoOpen === "true" && !expenseModal.open) expenseModal.showModal();
+
+  if (successMessage) {
+    saveConfirmation.focus();
+    saveConfirmation.addEventListener("click", () => {
+      successMessage.hidden = true;
+      modalForm.reset();
+      modalForm.querySelector("#modal-amount").setCustomValidity("");
+      updateNewCategoryField();
+      syncActiveDatePeriod();
+      modalForm.querySelector("#modal-amount").focus();
+    });
+  } else if (modalForm.querySelector("#modal-amount").value) {
+    modalForm.querySelector("#modal-amount").focus();
+  }
+}
+
+document.querySelectorAll("[data-open-expense-modal]").forEach((button) => {
+  button.addEventListener("click", () => {
+    if (expenseModal && !expenseModal.open) expenseModal.showModal();
+  });
+});
+
 const expenseForm = document.querySelector("[data-expense-form]");
 if (expenseForm) {
   const categorySelect = expenseForm.querySelector("#category");
-  const subcategorySelect = expenseForm.querySelector("#subcategory_id");
   const newCategoryField = expenseForm.querySelector("#new-category-field");
   const newCategoryInput = expenseForm.querySelector("#new_category");
-  const newSubcategoryField = expenseForm.querySelector("#new-subcategory-field");
-  const newSubcategoryInput = expenseForm.querySelector("#new_subcategory");
-  const saveSubcategoryButton = expenseForm.querySelector("[data-save-subcategory]");
-  const subcategorySaveStatus = expenseForm.querySelector("[data-subcategory-save-status]");
-  const csrfInput = expenseForm.querySelector('[name="csrf_token"]');
   const amountInput = expenseForm.querySelector("#amount");
+  const datePicker = expenseForm.querySelector("[data-custom-date-picker]");
+  const periodInput = expenseForm.querySelector("[data-expense-period]");
+  const dateValue = expenseForm.querySelector("[data-custom-date-value]");
+  const transactionDate = expenseForm.querySelector("[data-transaction-date]");
+  const intentInput = expenseForm.querySelector("[data-expense-intent]");
+
+  const toIsoDate = (value) => {
+    const localDate = new Date(value.getTime() - (value.getTimezoneOffset() * 60000));
+    return localDate.toISOString().split("T")[0];
+  };
+  const todayIso = () => toIsoDate(new Date());
+  const yesterdayIso = () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return toIsoDate(yesterday);
+  };
+  const submitFilter = () => {
+    intentInput.value = "filter";
+    expenseForm.noValidate = true;
+    expenseForm.requestSubmit();
+  };
 
   const updateNewCategoryField = () => {
     const addingCategory = categorySelect.value === "__new__";
@@ -53,92 +169,32 @@ if (expenseForm) {
     if (!addingCategory) newCategoryInput.value = "";
   };
 
-  const updateNewSubcategoryField = () => {
-    const addingSubcategory = subcategorySelect.value === "__new__";
-    newSubcategoryField.hidden = !addingSubcategory;
-    newSubcategoryInput.required = addingSubcategory;
-    saveSubcategoryButton.hidden = !addingSubcategory || !categorySelect.value || categorySelect.value === "__new__";
-    if (!addingSubcategory) newSubcategoryInput.value = "";
-  };
+  datePicker.max = todayIso();
+  datePicker.addEventListener("change", () => {
+    if (!datePicker.value) return;
+    periodInput.value = "custom";
+    dateValue.value = datePicker.value;
+    transactionDate.value = datePicker.value;
+    submitFilter();
+  });
 
-  const populateSubcategories = (preserveSelection) => {
-    const previousValue = preserveSelection ? subcategorySelect.value : "";
-    const categoryOption = categorySelect.selectedOptions[0];
-    let subcategories = [];
-    if (categoryOption && categoryOption.dataset.subcategories) {
-      try {
-        subcategories = JSON.parse(categoryOption.dataset.subcategories);
-      } catch {
-        subcategories = [];
-      }
-    }
+  expenseForm.addEventListener("click", (event) => {
+    const quickFilter = event.target.closest("[data-date-period]");
+    if (!quickFilter) return;
 
-    subcategorySelect.replaceChildren(new Option("No subcategory", ""));
-    for (const subcategory of subcategories) {
-      subcategorySelect.add(new Option(subcategory.name, String(subcategory.id)));
-    }
-    subcategorySelect.add(new Option("+ Add subcategory...", "__new__"));
-    if ([...subcategorySelect.options].some((option) => option.value === previousValue)) {
-      subcategorySelect.value = previousValue;
-    }
-    updateNewSubcategoryField();
-  };
+    const selectedPeriod = quickFilter.dataset.datePeriod;
+    periodInput.value = selectedPeriod;
+    dateValue.value = "";
+    datePicker.value = todayIso();
+    transactionDate.value = selectedPeriod === "yesterday" ? yesterdayIso() : todayIso();
+    submitFilter();
+  });
 
   categorySelect.addEventListener("change", () => {
     updateNewCategoryField();
-    populateSubcategories(false);
-    subcategorySaveStatus.textContent = "";
-  });
-  subcategorySelect.addEventListener("change", updateNewSubcategoryField);
-  saveSubcategoryButton.addEventListener("click", async () => {
-    const subcategoryName = newSubcategoryInput.value.trim().replace(/\s+/g, " ");
-    if (!subcategoryName) {
-      newSubcategoryInput.setCustomValidity("Enter a subcategory name.");
-      newSubcategoryInput.reportValidity();
-      return;
-    }
-
-    newSubcategoryInput.setCustomValidity("");
-    saveSubcategoryButton.disabled = true;
-    subcategorySaveStatus.textContent = "Saving subcategory...";
-    const endpoint = expenseForm.dataset.subcategoryUrl.replace(
-      "/0/subcategories",
-      `/${categorySelect.value}/subcategories`,
-    );
-
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": csrfInput.value,
-        },
-        body: JSON.stringify({ name: subcategoryName }),
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        subcategorySaveStatus.textContent = result.error || "Could not save the subcategory.";
-        return;
-      }
-
-      const existingOption = [...subcategorySelect.options].find(
-        (option) => option.value === String(result.id),
-      );
-      if (!existingOption) {
-        subcategorySelect.add(new Option(result.name, String(result.id)), subcategorySelect.lastElementChild);
-      }
-      subcategorySelect.value = String(result.id);
-      newSubcategoryInput.value = "";
-      updateNewSubcategoryField();
-      subcategorySaveStatus.textContent = `${result.name} added to this category.`;
-    } catch {
-      subcategorySaveStatus.textContent = "Could not save the subcategory. Please try again.";
-    } finally {
-      saveSubcategoryButton.disabled = false;
-    }
+    submitFilter();
   });
   updateNewCategoryField();
-  populateSubcategories(true);
 
   amountInput.addEventListener("input", () => {
     if (!amountInput.value) {
@@ -151,4 +207,79 @@ if (expenseForm) {
       amountInput.setCustomValidity("");
     }
   });
+
+  expenseForm.addEventListener("submit", (event) => {
+    if (intentInput.value === "filter") {
+      expenseForm.noValidate = false;
+      return;
+    }
+    intentInput.value = "save";
+    expenseForm.noValidate = false;
+    if (!expenseForm.reportValidity()) event.preventDefault();
+  });
+}
+
+const expenseCategoryFilter = document.querySelector("#category-filter");
+if (expenseCategoryFilter) {
+  expenseCategoryFilter.addEventListener("change", () => expenseCategoryFilter.form.requestSubmit());
+}
+
+const analyticsFilters = document.querySelector(".analytics-filters");
+if (analyticsFilters) {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1;
+  const yearSelect = analyticsFilters.querySelector('[name="year"]');
+  const monthSelect = analyticsFilters.querySelector('[name="month"]');
+  const daySelect = analyticsFilters.querySelector('[name="day"]');
+
+  const datePeriod = new URLSearchParams(window.location.search).get("date_period");
+  const dateValue = new URLSearchParams(window.location.search).get("date");
+  if (datePeriod) {
+    const periodInput = document.createElement("input");
+    periodInput.type = "hidden";
+    periodInput.name = "date_period";
+    periodInput.value = datePeriod;
+    analyticsFilters.append(periodInput);
+  }
+  if (dateValue) {
+    const dateInput = document.createElement("input");
+    dateInput.type = "hidden";
+    dateInput.name = "date";
+    dateInput.value = dateValue;
+    analyticsFilters.append(dateInput);
+  }
+
+  const syncMonthOptions = () => {
+    const selectedYear = Number(yearSelect.value || currentYear);
+    const maxMonth = selectedYear === currentYear ? currentMonth : 12;
+    const previousMonth = Number(monthSelect.value || currentMonth);
+
+    [...monthSelect.options].forEach((option) => {
+      const monthValue = Number(option.value);
+      option.disabled = selectedYear === currentYear && monthValue > maxMonth;
+    });
+
+    if (previousMonth > maxMonth) {
+      monthSelect.value = String(maxMonth);
+    }
+  };
+
+  const updateDays = (preserveSelection) => {
+    const previousDay = preserveSelection ? daySelect.value : "";
+    const dayCount = new Date(Number(yearSelect.value), Number(monthSelect.value), 0).getDate();
+    daySelect.replaceChildren(new Option("All days", ""));
+    for (let day = 1; day <= dayCount; day += 1) {
+      daySelect.add(new Option(String(day), String(day)));
+    }
+    if (Number(previousDay) <= dayCount) daySelect.value = previousDay;
+  };
+
+  yearSelect.addEventListener("change", () => {
+    syncMonthOptions();
+    updateDays(true);
+  });
+  monthSelect.addEventListener("change", () => updateDays(true));
+  syncMonthOptions();
+  updateDays(true);
 }

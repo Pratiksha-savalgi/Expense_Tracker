@@ -1,129 +1,71 @@
 # Web Page Development
 
-## 1. Purpose
+## Purpose
 
-Build the frontend pages for the Expense Tracker using simple, maintainable HTML, CSS, and JavaScript, rendered through Flask templates. The goal is to create a clean, form-driven interface for users to register, sign in, manage their expenses, set a monthly budget, and review category analytics without adding unnecessary complexity.
+Build the Expense Tracker interface using Flask templates, HTML, CSS, and
+lightweight JavaScript. Follow the current behavior in
+[docs/requirements.md](../../docs/requirements.md),
+[docs/spec.md](../../docs/spec.md), and [docs/design.md](../../docs/design.md).
 
-This work should follow the project architecture and the visual design documented in:
+## Pages
 
-- [docs/design-visuals.md](../../docs/design-visuals.md)
-- [docs/visuals/login-wireframe.svg](../../docs/visuals/login-wireframe.svg)
-- [docs/visuals/expenses-dashboard-wireframe.svg](../../docs/visuals/expenses-dashboard-wireframe.svg)
-- [docs/visuals/data-flow-diagram.svg](../../docs/visuals/data-flow-diagram.svg)
-- [docs/design.md](../../docs/design.md)
+- **Login/Register:** username/password access with clear feedback.
+- **Dashboard:** current-month budget amount, spending, remaining amount,
+  utilization, status, budget controls, and recent expenses.
+- **Expenses:** user-owned unfiltered expense list, category filter, add, edit,
+  and delete actions.
+- **Add Expense:** amount, category, date presets/custom picker, optional
+  description, and a preview of matching existing expenses and analytics.
+- **Edit Expense:** amount, category, date, optional description.
+- **Analytics:** year, month, day, and category filters; period summary,
+  category distribution, empty state, and previous-month comparison.
 
-## 2. Technologies to Use
+There are no subcategory or expense-type controls or displays.
 
-Use only the approved frontend stack for the project:
+## Add Expense date-filter component
 
-- HTML
-- CSS
-- JavaScript
-- Flask Templates
+- Match `docs/design/visuals/AddExpense.jpg`: amount across the form, category
+  beside the date controls, then description and save. Do not add separate
+  transaction-date or filter inputs.
+- The one selected period drives both the saved expense date and the filtered
+  existing-record preview: Today=today, Yesterday=yesterday, Last 7 Days=today,
+  Custom=the selected date. Category is likewise the new expense category and
+  preview filter.
+- Today is active on initial page load.
+- Exactly one quick option is active at a time. Use a visible active treatment
+  and update `aria-pressed` consistently.
+- Selecting a custom date submits immediately, activates the picker, and clears
+  the quick-option active state. Selecting any quick option clears the custom
+  date state.
+- Submit filters immediately without requiring a separate Apply button.
+- Preserve unsaved amount/description when date or category selection changes;
+  a filter submission must never save an expense. Preserve filters after a
+  valid save.
+- Keep the integrated controls usable at desktop, tablet, and mobile widths;
+  allow wrapping or a compact grid without horizontal overflow. Do not
+  duplicate filter state or inputs.
+- Refresh the matching existing-expense list, summary cards, and category
+  analytics from the server for the active filter. The Analytics link carries
+  the active date window and category. Keep the separate Expenses page as the
+  unfiltered ledger.
 
-Do not introduce additional frameworks or libraries unless explicitly approved by the project requirements. The current stack remains sufficient for the Version 2 scope.
+## Form and interaction rules
 
-## 3. Pages to Build
+- Mark required fields and describe validation failures clearly.
+- Expense amount must be positive with no more than two decimal places.
+- Expense date inputs have a maximum of today and client-side checks; server
+  validation remains authoritative.
+- Preserve user-entered values when server validation fails.
+- Analytics year/month choices cannot extend beyond the current month/current
+  year. Day options must reflect the selected month and year; reject future days.
+- Category choices and filters contain only the current user's categories.
+- Custom expense-list dates must be valid and no later than today.
+- Confirm delete actions in the browser; submit through the protected POST
+  route.
+- Keep all controls keyboard accessible and layouts responsive.
 
-Create pages that match the Expense Tracker flow and UI structure:
+## Integration and quality
 
-### Login
-- Render a clean login form with email/username and password fields.
-- Add a link or alternate action for registration.
-- Show validation or authentication errors returned by Flask.
-
-### Register
-- Create a registration form with required user details.
-- Validate fields before submission.
-- Display clear error messages when the input is invalid or duplicate.
-
-### Dashboard
-- Show the authenticated user’s main expense management area.
-- Include navigation to add, edit, view, and delete expense actions.
-- Display summary information such as total spending, monthly budget status, and category totals where appropriate.
-
-### Add Expense
-- Create a simple form for amount, main category, optional subcategory, date, Liability/Savings type, and optional description.
-- Show built-in categories and their subcategory suggestions in dependent dropdowns.
-- Provide **Add category** and **Add subcategory** choices for custom values.
-- For an existing category, provide an action to save a new subcategory immediately and add it to the current dropdown; a subcategory for a new category is saved with the expense.
-- Submit the form to a Flask route that validates and saves the record.
-- Show success or error feedback to the user.
-
-### Edit Expense
-- Render a pre-filled form for an existing expense record.
-- Allow the user to update the same fields, including category, subcategory, and Liability/Savings type.
-- Submit the update to the backend and confirm the result.
-
-### Monthly Budget Panel
-- Let the logged-in user choose a month and enter a budget amount.
-- Show the remaining amount and usage percentage when the budget is configured.
-- Display warning or exceeded states using simple status text or color cues.
-
-### Category Analytics View
-- Show category totals for the selected month.
-- Render a simple summary list or table for the current user.
-- Handle empty-state scenarios clearly when no category totals exist.
-
-## 4. UI Guidelines
-
-Keep the layout simple and consistent with the repository’s visual design.
-
-- Use a clean, readable layout.
-- Keep styling consistent across all pages.
-- Prefer a straightforward form-based design.
-- Maintain spacing, alignment, and readable typography.
-- Keep the interface focused on core expense-tracking actions.
-- Match the visual intent from the design visuals in the project.
-- Use simple status styles for budget warnings and over-budget alerts.
-
-## 5. Form Rules
-
-Follow consistent form behavior across the frontend:
-
-- Mark all required fields clearly.
-- Set numeric amount controls to positive values in 0.01 increments and provide clear validation feedback.
-- Preserve selected categories, subcategories, expense type, and entered values when server-side validation fails.
-- Use basic client-side validation for common issues like empty fields or invalid date formats.
-- Show clear error messages to the user.
-- Keep validation simple and helpful, without replacing backend validation.
-- Ensure forms are easy to complete on both desktop and smaller screens.
-
-## 6. Navigation Rules
-
-The page flow should be straightforward:
-
-- Login → Dashboard
-- Dashboard → Add Expense / Edit Expense / View Records
-- Dashboard → Monthly Budget / Analytics
-- Dashboard → Logout support
-- Each page should provide clear navigation or return paths.
-- Ensure authenticated users can access expense functionality and unauthenticated users are redirected appropriately.
-
-## 7. Flask Integration
-
-The frontend must integrate with the Flask application using standard route-based behavior:
-
-- Render templates using Flask routes.
-- Submit forms to backend routes for login, registration, add, edit, delete, budget, and analytics actions.
-- Display server-side messages, form errors, and validation feedback.
-- Use data returned by Flask to render dynamic lists, summaries, and form values.
-- Keep the browser layer focused on presentation and user interaction, while the backend enforces logic.
-
-## 8. Expected Output
-
-The deliverable should include:
-
-- HTML templates for login, register, dashboard, add expense, edit expense, and analytics views
-- Budget entry controls and summary panels in the dashboard or settings area
-- CSS files for the shared styling and layout
-- JavaScript files only if lightweight client-side behavior is needed
-- Simple, reusable structure suitable for the Expense Tracker project
-
-## 9. Implementation Standards
-
-- Keep code readable and beginner-friendly.
-- Follow Flask template conventions and keep page structure organized.
-- Reuse common UI patterns where possible.
-- Avoid unnecessary visual complexity.
-- Keep the implementation aligned with the project’s architecture, design, and accepted feature scope.
+Use the established Flask routes and template data. JavaScript provides
+convenience and does not replace server-side validation. Reuse shared styles
+and UI patterns; do not add frameworks or libraries without an approved need.

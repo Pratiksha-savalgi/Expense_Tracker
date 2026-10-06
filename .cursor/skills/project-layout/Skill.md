@@ -48,9 +48,9 @@ Examples:
 
 The Version 2 work should remain consistent with the same structure:
 
-- expense and budget routes stay in the backend layer
-- budget and analytics queries stay in the database layer
-- dashboard and summary panels stay in the frontend layer
+- `/dashboard`, `/expenses`, `/analytics`, and budget write routes stay in the backend layer
+- budget persistence and user-scoped period/category data access stay in the database layer
+- the Dashboard, Expenses, and Analytics templates and responsive summaries stay in the frontend layer
 - design decisions and requirement references stay in docs/
 
 ## 6. Quality Standard

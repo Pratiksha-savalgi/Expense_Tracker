@@ -8,7 +8,7 @@
     <h1>Edit an expense</h1>
     <p>Update the details below and save your changes.</p>
   </section>
-  <form method="post" class="entry-form" data-expense-form data-subcategory-url="{{ url_for('add_subcategory', category_id=0) }}">
+  <form method="post" class="entry-form" data-expense-form>
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="field-grid">
       <div class="field field-wide">
@@ -20,44 +20,19 @@
         <select id="category" name="category_id" required>
           <option value="">Choose a category</option>
           {% for category in categories %}
-          <option value="{{ category.id }}" data-subcategories="{{ category.subcategories|tojson|forceescape }}" {% if expense.category_id|string == category.id|string %}selected{% endif %}>{{ category.name }}</option>
+          <option value="{{ category.id }}" {% if expense.category_id|string == category.id|string %}selected{% endif %}>{{ category.name }}</option>
           {% endfor %}
           <option value="__new__" {% if expense.category_id == '__new__' %}selected{% endif %}>+ Add category...</option>
         </select>
       </div>
       <div class="field">
         <label for="expense_date">Date <span class="required-mark">*</span></label>
-        <input id="expense_date" name="expense_date" type="date" required value="{{ expense.expense_date }}">
+        <input id="expense_date" name="expense_date" type="date" required value="{{ expense.expense_date }}" max="{{ today | default('') }}">
       </div>
       <div class="field field-wide" id="new-category-field" {% if expense.category_id != '__new__' %}hidden{% endif %}>
         <label for="new_category">New category <span class="required-mark">*</span></label>
         <input id="new_category" name="new_category" type="text" value="{{ expense.new_category or '' }}" {% if expense.category_id == '__new__' %}required{% endif %}>
       </div>
-      <div class="field">
-        <label for="subcategory_id">Subcategory <span class="optional-mark">Optional</span></label>
-        <select id="subcategory_id" name="subcategory_id" data-selected="{{ expense.subcategory_id or '' }}">
-          <option value="">No subcategory</option>
-          {% for category in categories %}
-            {% if expense.category_id|string == category.id|string %}
-              {% for subcategory in category.subcategories %}
-              <option value="{{ subcategory.id }}" {% if expense.subcategory_id|string == subcategory.id|string %}selected{% endif %}>{{ subcategory.name }}</option>
-              {% endfor %}
-            {% endif %}
-          {% endfor %}
-          <option value="__new__" {% if expense.subcategory_id == '__new__' %}selected{% endif %}>+ Add subcategory...</option>
-        </select>
-      </div>
-      <div class="field" id="new-subcategory-field" {% if expense.subcategory_id != '__new__' %}hidden{% endif %}>
-        <label for="new_subcategory">New subcategory <span class="required-mark">*</span></label>
-        <input id="new_subcategory" name="new_subcategory" type="text" value="{{ expense.new_subcategory or '' }}" {% if expense.subcategory_id == '__new__' %}required{% endif %}>
-        <button class="button button-outline" type="button" data-save-subcategory hidden>Save subcategory</button>
-        <p class="subcategory-save-status" data-subcategory-save-status role="status" aria-live="polite"></p>
-      </div>
-      <fieldset class="field field-wide type-field">
-        <legend>Expense type <span class="required-mark">*</span></legend>
-        <label><input type="radio" name="expense_type" value="Liability" {% if expense.expense_type == 'Liability' %}checked{% endif %} required> Liability</label>
-        <label><input type="radio" name="expense_type" value="Savings" {% if expense.expense_type == 'Savings' %}checked{% endif %}> Savings</label>
-      </fieldset>
       <div class="field field-wide">
         <label for="description">Description <span class="optional-mark">Optional</span></label>
         <textarea id="description" name="description" rows="3" placeholder="What was this expense for?">{{ expense.description }}</textarea>

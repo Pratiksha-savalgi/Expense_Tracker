@@ -9,6 +9,37 @@
   <script src="{{ url_for('static', filename='script.js') }}" defer></script>
 </head>
 <body class="{% block body_class %}{% endblock %}">
+  {% if session.get('user_id') %}
+  <div class="app-frame">
+    <aside class="side-nav" aria-label="Main navigation">
+      <a class="brand" href="{{ url_for('dashboard') }}" aria-label="Ledger dashboard">
+        <span class="brand-mark" aria-hidden="true">L</span>
+        <span>ledger<span class="brand-period">.</span></span>
+      </a>
+      <nav class="side-links">
+        <a class="side-link {% if request.endpoint == 'dashboard' %}is-active{% endif %}" href="{{ url_for('dashboard') }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          <span>Dashboard</span>
+        </a>
+        <a class="side-link {% if request.endpoint == 'expenses_page' %}is-active{% endif %}" href="{{ url_for('expenses_page') }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18l-2-1-2 1-3-1-3 1-2-1-2 1z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>
+          <span>Expenses</span>
+        </a>
+        <a class="side-link {% if request.endpoint == 'analytics_page' %}is-active{% endif %}" href="{{ url_for('analytics_page') }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v9h9A9 9 0 1 1 12 3z"/><path d="M16 3.8A8.8 8.8 0 0 1 20.2 8H16z"/></svg>
+          <span>Analytics</span>
+        </a>
+      </nav>
+      <div class="sidebar-account">
+        <span class="user-name">{{ session.get('user_username') }}</span>
+        <form action="{{ url_for('logout') }}" method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="side-link side-signout" type="submit"><span aria-hidden="true">↪</span><span>Sign out</span></button>
+        </form>
+      </div>
+    </aside>
+    <div class="app-content">
+  {% else %}
   <header class="site-header">
     <a class="brand" href="{{ url_for('dashboard') if session.get('user_id') else url_for('login') }}" aria-label="Ledger home">
       <span class="brand-mark" aria-hidden="true">L</span>
@@ -24,6 +55,7 @@
     </div>
     {% endif %}
   </header>
+  {% endif %}
 
   <main class="page-shell">
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -38,6 +70,12 @@
     {% block content %}{% endblock %}
   </main>
 
+  {% if session.get('user_id') %}
+      <footer class="site-footer">A quieter view of your everyday spending.</footer>
+    </div>
+  </div>
+  {% else %}
   <footer class="site-footer">A quieter view of your everyday spending.</footer>
+  {% endif %}
 </body>
 </html>

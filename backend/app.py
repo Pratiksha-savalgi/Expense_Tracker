@@ -19,6 +19,23 @@ from database.database import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def load_or_create_secret_key(path):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with path.open("x", encoding="ascii") as secret_file:
+            secret_key = secrets.token_hex(32)
+            secret_file.write(secret_key)
+            return secret_key
+    except FileExistsError:
+        secret_key = path.read_text(encoding="ascii").strip()
+        if len(secret_key) < 32:
+            raise RuntimeError(f"Application secret key file is empty or invalid: {path}")
+        return secret_key
+
+
 app = Flask(
     __name__,
     static_url_path="/static",
@@ -26,7 +43,8 @@ app = Flask(
     template_folder=str(PROJECT_ROOT / "frontend" / "templates"),
 )
 app.config.update(
-    SECRET_KEY=os.environ.get("EXPENSE_TRACKER_SECRET") or secrets.token_hex(32),
+    SECRET_KEY=os.environ.get("EXPENSE_TRACKER_SECRET")
+    or load_or_create_secret_key(PROJECT_ROOT / "instance" / "secret_key"),
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
 )
@@ -61,7 +79,11 @@ def protect_form_submissions():
             submitted_token = request.headers.get("X-CSRF-Token", "")
         saved_token = session.get("csrf_token", "")
         if not saved_token or not hmac.compare_digest(submitted_token, saved_token):
-            abort(400)
+            if request.is_json:
+                abort(400)
+            session.clear()
+            flash("Your session expired. Please sign in again.", "error")
+            return redirect(url_for("login"))
 
 
 def login_required(view):
@@ -89,24 +111,10 @@ def get_user_categories(user_id):
     seed_default_categories(user_id)
     with database_connection() as connection:
         rows = connection.execute(
-            "SELECT c.id AS category_id, c.name AS category_name, "
-            "s.id AS subcategory_id, s.name AS subcategory_name "
-            "FROM categories c LEFT JOIN subcategories s ON s.category_id = c.id "
-            "WHERE c.user_id = ? ORDER BY c.name COLLATE NOCASE, s.name COLLATE NOCASE",
+            "SELECT id, name FROM categories WHERE user_id = ? ORDER BY name COLLATE NOCASE",
             (user_id,),
         ).fetchall()
-
-    categories_by_id = {}
-    for row in rows:
-        category = categories_by_id.setdefault(
-            row["category_id"],
-            {"id": row["category_id"], "name": row["category_name"], "subcategories": []},
-        )
-        if row["subcategory_id"] is not None:
-            category["subcategories"].append(
-                {"id": row["subcategory_id"], "name": row["subcategory_name"]}
-            )
-    return list(categories_by_id.values())
+    return [{"id": row["id"], "name": row["name"]} for row in rows]
 
 
 def parse_expense_form(form, user_id):
@@ -116,11 +124,8 @@ def parse_expense_form(form, user_id):
     if not category_choice and form.get("category", "").strip():
         category_choice = "__new__"
         new_category = normalize_category_name(form.get("category", ""))
-    subcategory_choice = form.get("subcategory_id", "").strip()
-    new_subcategory = normalize_category_name(form.get("new_subcategory", ""))
     expense_date = form.get("expense_date", "").strip()
     description = form.get("description", "").strip()
-    expense_type = form.get("expense_type", "Liability").strip().casefold()
     errors = []
 
     amount = None
@@ -175,52 +180,12 @@ def parse_expense_form(form, user_id):
                 category_id = str(category["id"])
                 category_name = category["name"]
 
-    subcategory_id = None
-    subcategory_name = ""
-    if subcategory_choice == "__new__":
-        if not new_subcategory:
-            errors.append("Enter a name for the new subcategory.")
-        else:
-            subcategory_name = new_subcategory
-            if category_id is not None:
-                with database_connection() as connection:
-                    subcategory = connection.execute(
-                        "SELECT id, name FROM subcategories "
-                        "WHERE category_id = ? AND normalized_name = ?",
-                        (int(category_id), new_subcategory.casefold()),
-                    ).fetchone()
-                if subcategory is not None:
-                    subcategory_id = str(subcategory["id"])
-                    subcategory_name = subcategory["name"]
-                    new_subcategory = ""
-    elif subcategory_choice:
-        try:
-            selected_subcategory_id = int(subcategory_choice)
-        except ValueError:
-            selected_subcategory_id = None
-        if selected_subcategory_id is None or category_id is None:
-            errors.append("Choose a subcategory belonging to the selected category.")
-        else:
-            with database_connection() as connection:
-                subcategory = connection.execute(
-                    "SELECT id, name FROM subcategories WHERE id = ? AND category_id = ?",
-                    (selected_subcategory_id, int(category_id)),
-                ).fetchone()
-            if subcategory is None:
-                errors.append("Choose a subcategory belonging to the selected category.")
-            else:
-                subcategory_id = str(subcategory["id"])
-                subcategory_name = subcategory["name"]
-
-    if expense_type not in {"liability", "savings"}:
-        errors.append("Choose whether this entry is a liability or savings.")
-    else:
-        expense_type = expense_type.title()
-
     try:
         parsed_date = date.fromisoformat(expense_date)
         if parsed_date.isoformat() != expense_date:
             errors.append("Enter a valid expense date.")
+        elif parsed_date > date.today():
+            errors.append("Expense date cannot be in the future.")
     except ValueError:
         errors.append("Enter a valid expense date.")
 
@@ -229,10 +194,6 @@ def parse_expense_form(form, user_id):
         "category_id": category_id or category_choice,
         "category_name": category_name,
         "new_category": new_category,
-        "subcategory_id": subcategory_id or subcategory_choice,
-        "subcategory_name": subcategory_name,
-        "new_subcategory": new_subcategory,
-        "expense_type": expense_type or "Liability",
         "expense_date": expense_date,
         "description": description,
     }, errors
@@ -252,20 +213,6 @@ def get_or_create_category(connection, user_id, category_name):
     ).fetchone()
 
 
-def get_or_create_subcategory(connection, category_id, subcategory_name):
-    subcategory_name = normalize_category_name(subcategory_name)
-    normalized_name = subcategory_name.casefold()
-    connection.execute(
-        "INSERT INTO subcategories (category_id, name, normalized_name) VALUES (?, ?, ?) "
-        "ON CONFLICT(category_id, normalized_name) DO NOTHING",
-        (category_id, subcategory_name, normalized_name),
-    )
-    return connection.execute(
-        "SELECT id, name FROM subcategories WHERE category_id = ? AND normalized_name = ?",
-        (category_id, normalized_name),
-    ).fetchone()
-
-
 def save_expense(connection, user_id, values, expense_id=None):
     category = (
         connection.execute(
@@ -278,28 +225,11 @@ def save_expense(connection, user_id, values, expense_id=None):
     if category is None:
         raise ValueError("Choose a valid category.")
 
-    if values["subcategory_id"] == "__new__" and values["new_subcategory"]:
-        subcategory = get_or_create_subcategory(connection, category["id"], values["new_subcategory"])
-        subcategory_id = subcategory["id"]
-        subcategory_name = subcategory["name"]
-    elif values["subcategory_id"]:
-        subcategory = connection.execute(
-            "SELECT id, name FROM subcategories WHERE id = ? AND category_id = ?",
-            (int(values["subcategory_id"]), category["id"]),
-        ).fetchone()
-        if subcategory is None:
-            raise ValueError("Choose a subcategory belonging to the selected category.")
-        subcategory_id = subcategory["id"]
-        subcategory_name = subcategory["name"]
-    else:
-        subcategory_id = None
-        subcategory_name = ""
-
     if expense_id is None:
         connection.execute(
             "INSERT INTO expenses "
-            "(user_id, amount, category, expense_date, description, category_id, subcategory_id, expense_type) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "(user_id, amount, category, expense_date, description, category_id) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
             (
                 user_id,
                 values["amount"],
@@ -307,83 +237,106 @@ def save_expense(connection, user_id, values, expense_id=None):
                 values["expense_date"],
                 values["description"],
                 category["id"],
-                subcategory_id,
-                values["expense_type"],
             ),
         )
     else:
         connection.execute(
             "UPDATE expenses SET amount = ?, category = ?, expense_date = ?, description = ?, "
-            "category_id = ?, subcategory_id = ?, expense_type = ? "
-            "WHERE id = ? AND user_id = ?",
+            "category_id = ? WHERE id = ? AND user_id = ?",
             (
                 values["amount"],
                 category["name"],
                 values["expense_date"],
                 values["description"],
                 category["id"],
-                subcategory_id,
-                values["expense_type"],
                 expense_id,
                 user_id,
             ),
         )
 
 
-def get_category_analytics(user_id, target_month):
-    if not target_month:
-        target_month = date.today().strftime("%Y-%m")
+def get_period_analytics(user_id, year, month, day=None, category_id=None, start_date=None, end_date=None):
+    period_start = start_date or date(year, month, day or 1)
+    if end_date is not None:
+        period_end = end_date
+    elif day:
+        period_end = date.fromordinal(period_start.toordinal() + 1)
+    elif month == 12:
+        period_end = date(year + 1, 1, 1)
+    else:
+        period_end = date(year, month + 1, 1)
 
-    try:
-        year, month = (int(part) for part in target_month.split("-"))
-        if month < 1 or month > 12:
-            raise ValueError
-        date(year, month, 1)
-    except (ValueError, TypeError):
-        target_month = date.today().strftime("%Y-%m")
+    conditions = ["user_id = ?", "expense_date >= ?", "expense_date < ?"]
+    parameters = [user_id, period_start.isoformat(), period_end.isoformat()]
+    if category_id is not None:
+        conditions.append("category_id = ?")
+        parameters.append(category_id)
 
     with database_connection() as connection:
         rows = connection.execute(
-            """
-            SELECT category, SUM(CAST(amount AS REAL)) AS total
-            FROM expenses
-            WHERE user_id = ? AND substr(expense_date, 1, 7) = ?
-            GROUP BY category
-            ORDER BY total DESC, category COLLATE NOCASE ASC
-            """,
-            (user_id, target_month),
+            "SELECT category, amount FROM expenses WHERE " + " AND ".join(conditions),
+            parameters,
         ).fetchall()
 
-    analytics = []
-    month_total = Decimal("0")
+    category_totals = {}
+    total = Decimal("0")
     for row in rows:
-        row_total = Decimal(str(row["total"]))
-        month_total += row_total
-        analytics.append({
-            "category": row["category"],
-            "total": row_total,
+        amount = Decimal(row["amount"])
+        category_totals[row["category"]] = category_totals.get(row["category"], Decimal("0")) + amount
+        total += amount
+
+    chart_colors = ["#159447", "#f47b20", "#2167d5", "#009b8a", "#d95643", "#b28a16", "#7956a8"]
+    items = []
+    chart_stops = []
+    position = Decimal("0")
+    for index, (category, category_total) in enumerate(
+        sorted(category_totals.items(), key=lambda item: (-item[1], item[0].casefold()))
+    ):
+        percentage = category_total / total * Decimal("100") if total else Decimal("0")
+        next_position = position + percentage
+        color = chart_colors[index % len(chart_colors)]
+        items.append({
+            "category": category,
+            "total": category_total,
+            "percentage": percentage,
+            "color": color,
         })
-
-    if analytics:
-        for item in analytics:
-            item["percentage"] = (item["total"] / month_total * Decimal("100")) if month_total > 0 else Decimal("0")
-    else:
-        for item in analytics:
-            item["percentage"] = Decimal("0")
-
-    highest_category = None
-    lowest_category = None
-    if analytics:
-        highest_category = max(analytics, key=lambda item: item["total"])
-        lowest_category = min(analytics, key=lambda item: item["total"])
+        chart_stops.append(f"{color} {position:.2f}% {next_position:.2f}%")
+        position = next_position
 
     return {
-        "month": target_month,
-        "items": analytics,
-        "total": month_total,
-        "highest_category": highest_category,
-        "lowest_category": lowest_category,
+        "items": items,
+        "total": total,
+        "count": len(rows),
+        "average": total / len(rows) if rows else Decimal("0"),
+        "highest_category": items[0] if items else None,
+        "chart_background": "conic-gradient(" + ", ".join(chart_stops) + ")" if chart_stops else "",
     }
+
+
+def resolve_expense_date_filter(period, selected_date, today):
+    period = period or ("custom" if selected_date else "today")
+    if period == "today":
+        return period, today, date.fromordinal(today.toordinal() + 1), today.isoformat(), None
+    if period == "yesterday":
+        yesterday = date.fromordinal(today.toordinal() - 1)
+        return period, yesterday, today, "", None
+    if period == "last7":
+        start_date = date.fromordinal(today.toordinal() - 6)
+        return period, start_date, date.fromordinal(today.toordinal() + 1), "", None
+    if period == "custom":
+        try:
+            parsed_date = date.fromisoformat(selected_date)
+            if parsed_date.isoformat() != selected_date or parsed_date > today:
+                raise ValueError
+        except ValueError:
+            return "today", today, date.fromordinal(today.toordinal() + 1), today.isoformat(), (
+                "Choose a valid date no later than today."
+            )
+        return period, parsed_date, date.fromordinal(parsed_date.toordinal() + 1), selected_date, None
+    return "today", today, date.fromordinal(today.toordinal() + 1), today.isoformat(), (
+        "Choose a valid date filter."
+    )
 
 
 def get_budget_summary(user_id, month=None, year=None):
@@ -395,14 +348,14 @@ def get_budget_summary(user_id, month=None, year=None):
             "SELECT id, budget_amount FROM budgets WHERE user_id = ? AND month = ? AND year = ?",
             (user_id, selected_month, selected_year),
         ).fetchone()
-        total_spent_row = connection.execute(
-            "SELECT COALESCE(SUM(CAST(amount AS REAL)), 0) AS total_spent FROM expenses "
+        spent_rows = connection.execute(
+            "SELECT amount FROM expenses "
             "WHERE user_id = ? AND CAST(strftime('%Y', expense_date) AS INTEGER) = ? "
             "AND CAST(strftime('%m', expense_date) AS INTEGER) = ?",
             (user_id, selected_year, selected_month),
-        ).fetchone()
+        ).fetchall()
 
-    spent = Decimal(str(total_spent_row["total_spent"])) if total_spent_row and total_spent_row["total_spent"] is not None else Decimal("0")
+    spent = sum((Decimal(row["amount"]) for row in spent_rows), Decimal("0"))
     budget_amount = Decimal(str(budget["budget_amount"])) if budget else None
 
     if budget_amount is None:
@@ -509,6 +462,7 @@ def login():
         session.clear()
         session["user_id"] = user["id"]
         session["user_username"] = user["username"]
+        session["show_add_expense_modal"] = True
         csrf_token()
         return redirect(url_for("dashboard"))
 
@@ -523,41 +477,53 @@ def logout():
     return redirect(url_for("login"))
 
 
+@app.post("/expenses/modal/dismiss")
+@login_required
+def dismiss_expense_modal():
+    session["show_add_expense_modal"] = False
+    session.pop("expense_save_success", None)
+    return redirect(url_for("dashboard"))
+
+
+def _render_dashboard(expense=None, modal_errors=None, modal_success=False, status=200):
+    today = date.today()
+    budget = get_budget_summary(session["user_id"], today.month, today.year)
+    with database_connection() as connection:
+        recent_expenses = connection.execute(
+            "SELECT e.id, e.amount, e.category, e.expense_date, e.description "
+            "FROM expenses e WHERE e.user_id = ? ORDER BY e.expense_date DESC, e.id DESC LIMIT 6",
+            (session["user_id"],),
+        ).fetchall()
+    return render_template(
+        "dashboard.html",
+        budget=budget,
+        recent_expenses=recent_expenses,
+        categories=get_user_categories(session["user_id"]),
+        expense=expense or {
+            "amount": "",
+            "category_id": "",
+            "new_category": "",
+            "expense_date": today.isoformat(),
+            "description": "",
+        },
+        today=today.isoformat(),
+        show_expense_modal=session.get("show_add_expense_modal", False),
+        modal_errors=modal_errors or [],
+        modal_success=modal_success,
+    ), status
+
+
 @app.get("/dashboard")
 @login_required
 def dashboard():
+    modal_success = session.pop("expense_save_success", False)
+    return _render_dashboard(modal_success=modal_success)
+
+
+@app.get("/expenses")
+@login_required
+def expenses_page():
     category_filter = request.args.get("category", "").strip()
-    date_filter = request.args.get("date", "").strip()
-    analytics_month = request.args.get("analytics_month", date.today().strftime("%Y-%m")).strip()
-    if date_filter:
-        try:
-            parsed_date = date.fromisoformat(date_filter)
-            if parsed_date.isoformat() != date_filter:
-                raise ValueError
-        except ValueError:
-            flash("Choose a valid date to filter expenses.", "error")
-            date_filter = ""
-
-    try:
-        year, month = (int(part) for part in analytics_month.split("-"))
-        if month < 1 or month > 12:
-            raise ValueError
-        date(year, month, 1)
-    except (ValueError, TypeError):
-        flash("Choose a valid month for category analytics.", "error")
-        analytics_month = date.today().strftime("%Y-%m")
-
-    try:
-        selected_month = int(request.args.get("month", date.today().month))
-        selected_year = int(request.args.get("year", date.today().year))
-        if selected_month < 1 or selected_month > 12:
-            raise ValueError
-        date(selected_year, selected_month, 1)
-    except (ValueError, TypeError):
-        flash("Choose a valid month and year for budget tracking.", "error")
-        selected_month = date.today().month
-        selected_year = date.today().year
-
     categories = get_user_categories(session["user_id"])
     valid_category_ids = {str(category["id"]) for category in categories}
     if category_filter and category_filter not in valid_category_ids:
@@ -569,37 +535,150 @@ def dashboard():
     if category_filter:
         conditions.append("e.category_id = ?")
         values.append(category_filter)
-    if date_filter:
-        conditions.append("e.expense_date = ?")
-        values.append(date_filter)
 
     with database_connection() as connection:
         expenses = connection.execute(
-            "SELECT e.id, e.amount, e.category, e.category_id, e.subcategory_id, "
-            "COALESCE(s.name, '') AS subcategory, e.expense_date, e.description, e.expense_type "
-            "FROM expenses e LEFT JOIN subcategories s ON s.id = e.subcategory_id "
+            "SELECT e.id, e.amount, e.category, e.category_id, e.expense_date, e.description "
+            "FROM expenses e "
             f"WHERE {' AND '.join(conditions)} "
             "ORDER BY e.expense_date DESC, e.id DESC",
             values,
         ).fetchall()
 
     total = sum((Decimal(expense["amount"]) for expense in expenses), Decimal("0"))
-    analytics = get_category_analytics(session["user_id"], analytics_month)
-    budget = get_budget_summary(session["user_id"], selected_month, selected_year)
     return render_template(
         "view_expenses.html",
         expenses=expenses,
         categories=categories,
         category_filter=category_filter,
-        date_filter=date_filter,
         total=total,
-        analytics_month=analytics["month"],
-        analytics_items=analytics["items"],
-        highest_category=analytics["highest_category"],
-        lowest_category=analytics["lowest_category"],
-        budget=budget,
-        selected_month=selected_month,
+    )
+
+
+@app.get("/analytics")
+@login_required
+def analytics_page():
+    today = date.today()
+    date_period = request.args.get("date_period", "").strip()
+    date_filter = request.args.get("date", "").strip()
+    date_range = None
+    date_label = ""
+    if date_period or date_filter:
+        date_period, range_start, range_end, date_filter, date_error = resolve_expense_date_filter(
+            date_period,
+            date_filter,
+            today,
+        )
+        if date_error:
+            flash(date_error, "error")
+        date_range = (range_start, range_end)
+        date_label = {
+            "today": "Today",
+            "yesterday": "Yesterday",
+            "last7": "Last 7 Days",
+            "custom": date_filter,
+        }[date_period]
+    analytics_period = (
+        date.fromordinal(date_range[1].toordinal() - 1) if date_range else today
+    )
+    try:
+        selected_year = int(request.args.get("year", analytics_period.year))
+        selected_month = int(request.args.get("month", analytics_period.month))
+        if selected_year < 1 or selected_year > 9999:
+            raise ValueError
+        if selected_year > today.year or (selected_year == today.year and selected_month > today.month):
+            raise ValueError
+        date(selected_year, selected_month, 1)
+    except (ValueError, TypeError):
+        flash("Analytics can only be viewed up to the current month and year.", "error")
+        selected_year, selected_month = today.year, today.month
+
+    raw_day = "" if date_range else request.args.get("day", "").strip()
+    try:
+        selected_day = int(raw_day) if raw_day else None
+        if selected_day is not None:
+            date(selected_year, selected_month, selected_day)
+            if date(selected_year, selected_month, selected_day) > today:
+                raise ValueError
+    except (ValueError, TypeError):
+        flash("Choose a valid day for analytics.", "error")
+        selected_day = None
+
+    categories = get_user_categories(session["user_id"])
+    category_filter = request.args.get("category", "").strip()
+    category_ids = {str(category["id"]) for category in categories}
+    if category_filter and category_filter not in category_ids:
+        flash("Choose a valid category filter.", "error")
+        category_filter = ""
+    selected_category_id = int(category_filter) if category_filter else None
+
+    analytics = get_period_analytics(
+        session["user_id"],
+        selected_year,
+        selected_month,
+        selected_day if date_range is None else None,
+        selected_category_id,
+        start_date=date_range[0] if date_range else None,
+        end_date=date_range[1] if date_range else None,
+    )
+
+    comparison_month_value = request.args.get("comparison_month", "").strip()
+    if comparison_month_value:
+        try:
+            if not re.fullmatch(r"\d{4}-\d{2}", comparison_month_value):
+                raise ValueError
+            comparison_year, comparison_month = map(int, comparison_month_value.split("-"))
+            date(comparison_year, comparison_month, 1)
+            if comparison_year > today.year or (
+                comparison_year == today.year and comparison_month > today.month
+            ):
+                raise ValueError
+        except (ValueError, TypeError):
+            flash("Choose a valid comparison month up to the current month.", "error")
+            comparison_year, comparison_month = selected_year, selected_month
+    else:
+        comparison_year, comparison_month = selected_year, selected_month
+
+    previous_month = comparison_month - 1 or 12
+    previous_year = comparison_year - 1 if comparison_month == 1 else comparison_year
+    comparison_budget = get_budget_summary(session["user_id"], comparison_month, comparison_year)
+    previous_budget = get_budget_summary(session["user_id"], previous_month, previous_year)
+    comparison_analytics = get_period_analytics(
+        session["user_id"], comparison_year, comparison_month, category_id=selected_category_id
+    )
+    previous_comparison = get_period_analytics(
+        session["user_id"], previous_year, previous_month, category_id=selected_category_id
+    )
+    with database_connection() as connection:
+        years = connection.execute(
+            "SELECT DISTINCT CAST(substr(expense_date, 1, 4) AS INTEGER) AS year "
+            "FROM expenses WHERE user_id = ? ORDER BY year DESC",
+            (session["user_id"],),
+        ).fetchall()
+    year_options = sorted({year for year in [today.year, selected_year, *(row["year"] for row in years)] if year <= today.year}, reverse=True)
+
+    return render_template(
+        "analytics.html",
+        categories=categories,
+        category_filter=category_filter,
         selected_year=selected_year,
+        selected_month=selected_month,
+        selected_day=selected_day,
+        comparison_year=comparison_year,
+        comparison_month=comparison_month,
+        comparison_month_value=f"{comparison_year:04d}-{comparison_month:02d}",
+        current_month_value=f"{today.year:04d}-{today.month:02d}",
+        year_options=year_options,
+        analytics=analytics,
+        comparison_analytics=comparison_analytics,
+        previous_comparison=previous_comparison,
+        comparison_budget=comparison_budget,
+        previous_budget=previous_budget,
+        previous_month=previous_month,
+        previous_year=previous_year,
+        date_period=date_period,
+        date_filter=date_filter,
+        date_label=date_label,
     )
 
 
@@ -609,9 +688,14 @@ def save_budget():
     try:
         month = int(request.form.get("month", ""))
         year = int(request.form.get("year", ""))
-        amount = Decimal(request.form.get("budget_amount", "").strip())
+        amount_text = request.form.get("budget_amount", "").strip()
+        amount = Decimal(amount_text)
         date(year, month, 1)
-        if not amount.is_finite() or amount <= 0:
+        if (
+            not amount.is_finite()
+            or amount <= 0
+            or not re.fullmatch(r"(?:\d+(?:\.\d{0,2})?|\.\d{1,2})", amount_text)
+        ):
             raise ValueError
     except (InvalidOperation, ValueError, TypeError):
         flash("Enter a valid month, year, and budget amount greater than zero.", "error")
@@ -629,54 +713,147 @@ def save_budget():
     return redirect(url_for("dashboard", month=month, year=year))
 
 
-@app.post("/categories/<int:category_id>/subcategories")
-@login_required
-def add_subcategory(category_id):
-    payload = request.get_json(silent=True) or {}
-    subcategory_name = normalize_category_name(payload.get("name", ""))
-    if not subcategory_name:
-        return jsonify(error="Enter a subcategory name."), 400
-
-    with database_connection() as connection:
-        category = connection.execute(
-            "SELECT id FROM categories WHERE id = ? AND user_id = ?",
-            (category_id, session["user_id"]),
-        ).fetchone()
-        if category is None:
-            abort(404)
-
-        subcategory = get_or_create_subcategory(connection, category_id, subcategory_name)
-
-    return jsonify(id=subcategory["id"], name=subcategory["name"])
-
-
 @app.route("/expenses/add", methods=["GET", "POST"])
 @login_required
 def add_expense():
+    today = date.today()
+    categories = get_user_categories(session["user_id"])
+    valid_category_ids = {str(category["id"]) for category in categories}
     values = {
         "amount": "",
         "category_id": "",
         "new_category": "",
-        "subcategory_id": "",
-        "new_subcategory": "",
-        "expense_type": "Liability",
-        "expense_date": date.today().isoformat(),
+        "expense_date": today.isoformat(),
         "description": "",
     }
-    categories = get_user_categories(session["user_id"])
     if request.method == "POST":
-        values, errors = parse_expense_form(request.form, session["user_id"])
+        raw_period = request.form.get("date_period", "").strip()
+        raw_date_filter = request.form.get("date", "").strip()
+        intent = request.form.get("intent", "save")
+        if intent == "modal_save":
+            raw_period = "custom"
+            raw_date_filter = request.form.get("expense_date", "").strip()
+        elif not raw_period and request.form.get("expense_date", "").strip():
+            raw_period = "custom"
+            raw_date_filter = request.form.get("expense_date", "").strip()
+        values.update({
+            "amount": request.form.get("amount", "").strip(),
+            "category_id": request.form.get("category_id", "").strip(),
+            "new_category": request.form.get("new_category", "").strip(),
+            "description": request.form.get("description", "").strip(),
+        })
+    else:
+        raw_period = request.args.get("date_period", "").strip()
+        raw_date_filter = request.args.get("date", "").strip()
+        intent = "save"
+        category_query = request.args.get("category", "").strip()
+        if category_query and category_query not in valid_category_ids:
+            flash("Choose a valid category filter.", "error")
+        elif category_query:
+            values["category_id"] = category_query
+
+    date_period, date_start, date_end, date_filter, date_error = resolve_expense_date_filter(
+        raw_period,
+        raw_date_filter,
+        today,
+    )
+    transaction_date = {
+        "today": today,
+        "yesterday": date_start,
+        "last7": today,
+        "custom": date_start,
+    }[date_period]
+    values["expense_date"] = transaction_date.isoformat()
+
+    if date_error and intent != "modal_save":
+        flash(date_error, "error")
+
+    category_filter = values["category_id"]
+    if category_filter and category_filter not in valid_category_ids:
+        if category_filter != "__new__" and intent != "modal_save":
+            flash("Choose a valid category filter.", "error")
+        category_filter = ""
+
+    conditions = ["e.user_id = ?", "e.expense_date >= ?", "e.expense_date < ?"]
+    filter_values = [session["user_id"], date_start.isoformat(), date_end.isoformat()]
+    if category_filter:
+        conditions.append("e.category_id = ?")
+        filter_values.append(category_filter)
+    with database_connection() as connection:
+        expenses = connection.execute(
+            "SELECT e.id, e.amount, e.category, e.category_id, e.expense_date, e.description "
+            "FROM expenses e "
+            f"WHERE {' AND '.join(conditions)} "
+            "ORDER BY e.expense_date DESC, e.id DESC",
+            filter_values,
+        ).fetchall()
+
+    date_analytics = get_period_analytics(
+        session["user_id"],
+        date_start.year,
+        date_start.month,
+        category_id=int(category_filter) if category_filter else None,
+        start_date=date_start,
+        end_date=date_end,
+    )
+    total = date_analytics["total"]
+
+    def render_add_expense(status=200):
+        return render_template(
+            "add_expense.html",
+            expense=values,
+            categories=categories,
+            today=today.isoformat(),
+            expenses=expenses,
+            category_filter=category_filter,
+            date_period=date_period,
+            date_filter=date_filter,
+            date_label={
+                "today": "Today",
+                "yesterday": "Yesterday",
+                "last7": "Last 7 Days",
+                "custom": date_filter,
+            }[date_period],
+            date_analytics=date_analytics,
+            total=total,
+        ), status
+
+    if request.method == "POST":
+        if intent == "filter":
+            return render_add_expense()
+
+        if date_error:
+            if intent == "modal_save":
+                session["show_add_expense_modal"] = True
+                return _render_dashboard(values, [date_error], status=400)
+            return render_add_expense(400)
+
+        form_data = request.form.to_dict()
+        form_data["expense_date"] = transaction_date.isoformat()
+        values, errors = parse_expense_form(form_data, session["user_id"])
         if errors:
+            if intent == "modal_save":
+                session["show_add_expense_modal"] = True
+                return _render_dashboard(values, errors, status=400)
             for error in errors:
                 flash(error, "error")
-            return render_template("add_expense.html", expense=values, categories=categories), 400
+            return render_add_expense(400)
 
         with database_connection() as connection:
             save_expense(connection, session["user_id"], values)
+        if intent == "modal_save":
+            session["show_add_expense_modal"] = True
+            session["expense_save_success"] = True
+            return redirect(url_for("dashboard"))
         flash("Expense saved.", "success")
-        return redirect(url_for("dashboard"))
+        return redirect(url_for(
+            "add_expense",
+            date_period=date_period,
+            date=date_filter if date_period == "custom" else None,
+            category=values["category_id"] if values["category_id"] != "__new__" else None,
+        ))
 
-    return render_template("add_expense.html", expense=values, categories=categories)
+    return render_add_expense()
 
 
 @app.route("/expenses/<int:expense_id>/edit", methods=["GET", "POST"])
@@ -685,8 +862,8 @@ def edit_expense(expense_id):
     categories = get_user_categories(session["user_id"])
     with database_connection() as connection:
         expense = connection.execute(
-            "SELECT id, amount, category, category_id, subcategory_id, expense_type, "
-            "expense_date, description FROM expenses WHERE id = ? AND user_id = ?",
+            "SELECT id, amount, category, category_id, expense_date, description "
+            "FROM expenses WHERE id = ? AND user_id = ?",
             (expense_id, session["user_id"]),
         ).fetchone()
         if expense is None:
@@ -701,6 +878,7 @@ def edit_expense(expense_id):
                     "edit_expense.html",
                     expense={**dict(expense), **values},
                     categories=categories,
+                    today=date.today().isoformat(),
                 ), 400
 
             save_expense(connection, session["user_id"], values, expense_id)
@@ -708,7 +886,7 @@ def edit_expense(expense_id):
     if request.method == "POST":
         flash("Expense updated.", "success")
         return redirect(url_for("dashboard"))
-    return render_template("edit_expense.html", expense=expense, categories=categories)
+    return render_template("edit_expense.html", expense=expense, categories=categories, today=date.today().isoformat())
 
 
 @app.post("/expenses/<int:expense_id>/delete")

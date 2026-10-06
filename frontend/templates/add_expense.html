@@ -1,15 +1,20 @@
 {% extends "base.html" %}
 {% block title %}Add expense{% endblock %}
 {% block content %}
-<div class="content-narrow">
-  <a class="back-link" href="{{ url_for('dashboard') }}"><span aria-hidden="true">←</span> All expenses</a>
+<div class="content-narrow add-expense-page">
+  <a class="back-link" href="{{ url_for('expenses_page') }}"><span aria-hidden="true">←</span> All expenses</a>
   <section class="form-page-heading">
     <p class="eyebrow">Expense record</p>
     <h1>Add an expense</h1>
     <p>Capture the amount, category, and date. Description is optional.</p>
   </section>
-  <form method="post" class="entry-form" data-expense-form data-subcategory-url="{{ url_for('add_subcategory', category_id=0) }}">
+  <form method="post" class="entry-form add-expense-form" data-expense-form novalidate>
+    <a class="add-expense-close" href="{{ url_for('expenses_page') }}" aria-label="Close Add Expense">×</a>
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="intent" value="save" data-expense-intent>
+    <input type="hidden" name="date_period" value="{{ date_period }}" data-expense-period>
+    <input type="hidden" name="date" value="{{ date_filter }}" data-custom-date-value>
+    <input type="hidden" name="expense_date" value="{{ expense.expense_date }}" data-transaction-date>
     <div class="field-grid">
       <div class="field field-wide">
         <label for="amount">Amount <span class="required-mark">*</span></label>
@@ -20,52 +25,35 @@
         <select id="category" name="category_id" required>
           <option value="">Choose a category</option>
           {% for category in categories %}
-          <option value="{{ category.id }}" data-subcategories="{{ category.subcategories|tojson|forceescape }}" {% if expense.category_id|string == category.id|string %}selected{% endif %}>{{ category.name }}</option>
+          <option value="{{ category.id }}" {% if expense.category_id|string == category.id|string %}selected{% endif %}>{{ category.name }}</option>
           {% endfor %}
           <option value="__new__" {% if expense.category_id == '__new__' %}selected{% endif %}>+ Add category...</option>
         </select>
       </div>
       <div class="field">
-        <label for="expense_date">Date <span class="required-mark">*</span></label>
-        <input id="expense_date" name="expense_date" type="date" required value="{{ expense.expense_date }}">
+        <span class="field-label">Date <span class="required-mark">*</span></span>
+        <div class="date-filter-options add-expense-date-options" role="group" aria-label="Expense date and existing expense date filter">
+          <button class="date-filter-option {% if date_period == 'today' %}is-active{% endif %}" type="button" data-date-period="today" aria-pressed="{{ 'true' if date_period == 'today' else 'false' }}">Today</button>
+          <button class="date-filter-option {% if date_period == 'yesterday' %}is-active{% endif %}" type="button" data-date-period="yesterday" aria-pressed="{{ 'true' if date_period == 'yesterday' else 'false' }}">Yesterday</button>
+          <button class="date-filter-option {% if date_period == 'last7' %}is-active{% endif %}" type="button" data-date-period="last7" aria-pressed="{{ 'true' if date_period == 'last7' else 'false' }}">−7 days</button>
+          <label class="date-picker-option {% if date_period == 'custom' %}is-active{% endif %}" for="custom-expense-date">
+            <span class="visually-hidden">Custom date</span>
+            <input id="custom-expense-date" type="date" value="{{ date_filter if date_period == 'custom' else today }}" max="{{ today }}" aria-label="Choose expense date" data-custom-date-picker>
+            <svg class="date-picker-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M7.5 3v4M16.5 3v4M4 9.5h16M8 13h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01"/></svg>
+          </label>
+        </div>
       </div>
       <div class="field field-wide" id="new-category-field" {% if expense.category_id != '__new__' %}hidden{% endif %}>
         <label for="new_category">New category <span class="required-mark">*</span></label>
         <input id="new_category" name="new_category" type="text" value="{{ expense.new_category }}" {% if expense.category_id == '__new__' %}required{% endif %}>
       </div>
-      <div class="field">
-        <label for="subcategory_id">Subcategory <span class="optional-mark">Optional</span></label>
-        <select id="subcategory_id" name="subcategory_id" data-selected="{{ expense.subcategory_id }}">
-          <option value="">No subcategory</option>
-          {% for category in categories %}
-            {% if expense.category_id|string == category.id|string %}
-              {% for subcategory in category.subcategories %}
-              <option value="{{ subcategory.id }}" {% if expense.subcategory_id|string == subcategory.id|string %}selected{% endif %}>{{ subcategory.name }}</option>
-              {% endfor %}
-            {% endif %}
-          {% endfor %}
-          <option value="__new__" {% if expense.subcategory_id == '__new__' %}selected{% endif %}>+ Add subcategory...</option>
-        </select>
-      </div>
-      <div class="field" id="new-subcategory-field" {% if expense.subcategory_id != '__new__' %}hidden{% endif %}>
-        <label for="new_subcategory">New subcategory <span class="required-mark">*</span></label>
-        <input id="new_subcategory" name="new_subcategory" type="text" value="{{ expense.new_subcategory }}" {% if expense.subcategory_id == '__new__' %}required{% endif %}>
-        <button class="button button-outline" type="button" data-save-subcategory hidden>Save subcategory</button>
-        <p class="subcategory-save-status" data-subcategory-save-status role="status" aria-live="polite"></p>
-      </div>
-      <fieldset class="field field-wide type-field">
-        <legend>Expense type <span class="required-mark">*</span></legend>
-        <label><input type="radio" name="expense_type" value="Liability" {% if expense.expense_type == 'Liability' %}checked{% endif %} required> Liability</label>
-        <label><input type="radio" name="expense_type" value="Savings" {% if expense.expense_type == 'Savings' %}checked{% endif %}> Savings</label>
-      </fieldset>
       <div class="field field-wide">
         <label for="description">Description <span class="optional-mark">Optional</span></label>
         <textarea id="description" name="description" rows="3" placeholder="What was this expense for?">{{ expense.description }}</textarea>
       </div>
     </div>
     <div class="form-actions">
-      <a class="button button-quiet" href="{{ url_for('dashboard') }}">Cancel</a>
-      <button class="button button-primary" type="submit">Save expense <span aria-hidden="true">→</span></button>
+      <button class="button button-primary" type="submit">Save expense</button>
     </div>
   </form>
 </div>

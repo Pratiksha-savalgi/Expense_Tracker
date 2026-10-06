@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<section class="dashboard-heading">
+  <div>
+    <p class="eyebrow">Your overview</p>
+    <h1>Dashboard</h1>
+    <p class="page-lede">An overview of your recorded expenses.</p>
+  </div>
+  <button class="button button-primary" type="button" data-open-expense-modal><span class="plus-mark" aria-hidden="true">+</span> Add expense</button>
+</section>
+
+<section class="budget-panel dashboard-budget" aria-labelledby="budget-panel-title">
+  <div class="budget-header">
+    <div>
+      <p class="eyebrow">Monthly budget</p>
+      <h2 id="budget-panel-title">Budget progress</h2>
+      <p class="page-lede">{{ "%02d"|format(budget.month) }}/{{ budget.year }}</p>
+    </div>
+    <a class="text-action" href="#budget-form">Edit budget</a>
+  </div>
+
+  <div class="budget-grid">
+    <div class="budget-card">
+      <span class="budget-label">Total Monthly Budget</span>
+      <strong>{% if budget.budget_amount is not none %}{{ format_money(budget.budget_amount) }}{% else %}Not set{% endif %}</strong>
+    </div>
+    <div class="budget-card">
+      <span class="budget-label">Current Month Expenses</span>
+      <strong>{{ format_money(budget.total_spent) }}</strong>
+    </div>
+    <div class="budget-card">
+      <span class="budget-label">Remaining Budget</span>
+      <strong>{% if budget.remaining is not none %}{{ format_money(budget.remaining) }}{% else %}—{% endif %}</strong>
+    </div>
+    <div class="budget-card">
+      <span class="budget-label">Budget Utilization</span>
+      <strong>{% if budget.budget_amount is not none %}{{ '%.1f'|format(budget.utilization) }}%{% else %}0%{% endif %}</strong>
+    </div>
+  </div>
+  <div class="budget-progress-track" role="progressbar" aria-label="Budget utilization"
+       aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ [budget.utilization, 100]|min }}">
+    <span class="budget-progress-fill budget-progress-{{ budget.status }}" style="width: {{ [budget.utilization, 100]|min }}%"></span>
+  </div>
+  <p class="budget-note">{{ budget.message }}</p>
+
+  <form id="budget-form" class="budget-form" method="post" action="{{ url_for('save_budget') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="budget-fields">
+      <div class="filter-field">
+        <label for="budget-month">Month</label>
+        <select id="budget-month" name="month">
+          {% for month_number in range(1, 13) %}
+          <option value="{{ month_number }}" {% if month_number == budget.month %}selected{% endif %}>{{ month_number }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="budget-year">Year</label>
+        <input id="budget-year" name="year" type="number" min="1" max="9999" value="{{ budget.year }}" required>
+      </div>
+      <div class="filter-field budget-amount-field">
+        <label for="budget-amount">Budget amount</label>
+        <input id="budget-amount" name="budget_amount" type="number" min="0.01" step="0.01" placeholder="25000" value="{{ budget.budget_amount if budget.budget_amount is not none else '' }}" required>
+      </div>
+      <button class="button button-primary" type="submit">Save budget</button>
+    </div>
+  </form>
+</section>
+
+<section class="records-section" aria-labelledby="recent-expenses-title">
+  <div class="records-heading">
+    <div>
+      <h2 id="recent-expenses-title">Recent expenses</h2>
+      <p class="page-lede">Your latest recorded spending</p>
+    </div>
+    <a class="text-action" href="{{ url_for('expenses_page') }}">View all <span aria-hidden="true">→</span></a>
+  </div>
+  {% if recent_expenses %}
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th scope="col">Expense</th><th scope="col">Category</th><th scope="col">Amount</th><th scope="col">Date</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+      <tbody>
+        {% for expense in recent_expenses %}
+        <tr>
+          <td class="description-cell">{{ expense.description or expense.category }}</td>
+          <td><span class="category-label">{{ expense.category }}</span></td>
+          <td class="amount-cell">{{ format_money(expense.amount) }}</td>
+          <td class="date-cell">{{ expense.expense_date }}</td>
+          <td class="action-cell"><a class="text-action" href="{{ url_for('edit_expense', expense_id=expense.id) }}">Edit</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <span class="empty-mark" aria-hidden="true">+</span>
+    <h3>Your ledger starts here</h3>
+    <p>Add an expense and it will appear here for you to review.</p>
+    <button class="button button-primary" type="button" data-open-expense-modal>Add your first expense</button>
+  </div>
+  {% endif %}
+</section>
+{% include "_add_expense_modal.html" %}
+{% endblock %}

@@ -10,18 +10,18 @@ DATABASE_PATH = os.environ.get(
     str(PROJECT_ROOT / "database" / "expenses.sqlite3"),
 )
 
-DEFAULT_CATEGORIES = {
-    "Food": ("Breakfast", "Lunch", "Dinner", "Groceries", "Snacks"),
-    "Utilities": ("Electricity", "Water", "Internet", "Gas"),
-    "Transport": ("Public transit", "Fuel", "Vehicle maintenance"),
-    "Household": ("Supplies", "Repairs", "Furniture"),
-    "Health": ("Medical", "Pharmacy"),
-    "Shopping": ("Clothing", "Personal care"),
-    "Education": ("Books", "Fees"),
-    "Entertainment": ("Subscriptions", "Outings"),
-    "Bills": ("Rent", "Insurance", "Loan payments"),
-    "Other": ("Miscellaneous",),
-}
+DEFAULT_CATEGORIES = (
+    "Food",
+    "Utilities",
+    "Transport",
+    "Household",
+    "Health",
+    "Shopping",
+    "Education",
+    "Entertainment",
+    "Bills",
+    "Other",
+)
 
 
 @contextmanager
@@ -41,29 +41,22 @@ def database_connection():
 
 
 def normalize_category_name(name):
-    return " ".join((name or "").split())
+    cleaned = " ".join((name or "").split())
+    if not cleaned:
+        return ""
+    return " ".join(part[:1].upper() + part[1:].lower() for part in cleaned.split())
 
 
 def seed_default_categories(user_id):
     with database_connection() as connection:
-        for category_name, subcategory_names in DEFAULT_CATEGORIES.items():
-            normalized_category = normalize_category_name(category_name).casefold()
+        for category_name in DEFAULT_CATEGORIES:
+            category_display_name = normalize_category_name(category_name)
+            normalized_category = category_display_name.casefold()
             connection.execute(
                 "INSERT INTO categories (user_id, name, normalized_name) VALUES (?, ?, ?) "
                 "ON CONFLICT(user_id, normalized_name) DO NOTHING",
-                (user_id, category_name, normalized_category),
+                (user_id, category_display_name, normalized_category),
             )
-            category = connection.execute(
-                "SELECT id FROM categories WHERE user_id = ? AND normalized_name = ?",
-                (user_id, normalized_category),
-            ).fetchone()
-            for subcategory_name in subcategory_names:
-                normalized_subcategory = normalize_category_name(subcategory_name).casefold()
-                connection.execute(
-                    "INSERT INTO subcategories (category_id, name, normalized_name) "
-                    "VALUES (?, ?, ?) ON CONFLICT(category_id, normalized_name) DO NOTHING",
-                    (category["id"], subcategory_name, normalized_subcategory),
-                )
 
 
 def initialize_database():
@@ -83,10 +76,7 @@ def initialize_database():
                 category TEXT NOT NULL,
                 expense_date TEXT NOT NULL,
                 description TEXT NOT NULL DEFAULT '',
-                category_id INTEGER REFERENCES categories(id) ON DELETE RESTRICT,
-                subcategory_id INTEGER REFERENCES subcategories(id) ON DELETE SET NULL,
-                expense_type TEXT NOT NULL DEFAULT 'Liability'
-                    CHECK (expense_type IN ('Liability', 'Savings'))
+                category_id INTEGER REFERENCES categories(id) ON DELETE RESTRICT
             );
 
             CREATE TABLE IF NOT EXISTS categories (
@@ -95,14 +85,6 @@ def initialize_database():
                 name TEXT NOT NULL,
                 normalized_name TEXT NOT NULL,
                 UNIQUE(user_id, normalized_name)
-            );
-
-            CREATE TABLE IF NOT EXISTS subcategories (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
-                name TEXT NOT NULL,
-                normalized_name TEXT NOT NULL,
-                UNIQUE(category_id, normalized_name)
             );
 
             CREATE TABLE IF NOT EXISTS budgets (
@@ -132,16 +114,32 @@ def initialize_database():
                 "ALTER TABLE expenses ADD COLUMN category_id INTEGER "
                 "REFERENCES categories(id) ON DELETE RESTRICT"
             )
-        if "subcategory_id" not in expense_columns:
+        if "subcategory_id" in expense_columns or "expense_type" in expense_columns:
+            connection.execute("ALTER TABLE expenses RENAME TO expenses_old")
             connection.execute(
-                "ALTER TABLE expenses ADD COLUMN subcategory_id INTEGER "
-                "REFERENCES subcategories(id) ON DELETE SET NULL"
+                """
+                CREATE TABLE expenses (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    amount TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    expense_date TEXT NOT NULL,
+                    description TEXT NOT NULL DEFAULT '',
+                    category_id INTEGER REFERENCES categories(id) ON DELETE RESTRICT
+                )
+                """
             )
-        if "expense_type" not in expense_columns:
             connection.execute(
-                "ALTER TABLE expenses ADD COLUMN expense_type TEXT NOT NULL "
-                "DEFAULT 'Liability' CHECK (expense_type IN ('Liability', 'Savings'))"
+                "INSERT INTO expenses (id, user_id, amount, category, expense_date, description, category_id) "
+                "SELECT id, user_id, amount, category, expense_date, description, category_id FROM expenses_old"
             )
+            connection.execute("DROP TABLE expenses_old")
+
+        table_names = {
+            row["name"] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+        }
+        if "subcategories" in table_names:
+            connection.execute("DROP TABLE subcategories")
 
         legacy_expenses = connection.execute(
             "SELECT id, user_id, category FROM expenses "
@@ -172,9 +170,7 @@ def initialize_database():
             """
             CREATE INDEX IF NOT EXISTS categories_by_user
                 ON categories(user_id, normalized_name);
-            CREATE INDEX IF NOT EXISTS subcategories_by_category
-                ON subcategories(category_id, normalized_name);
             CREATE INDEX IF NOT EXISTS expenses_by_category
-                ON expenses(user_id, category_id, subcategory_id);
+                ON expenses(user_id, category_id);
             """
         )

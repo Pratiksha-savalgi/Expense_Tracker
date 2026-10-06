@@ -1,0 +1,74 @@
+<dialog class="expense-modal" data-expense-modal data-auto-open="{{ 'true' if show_expense_modal else 'false' }}" aria-labelledby="expense-modal-title">
+  <div class="expense-modal-header">
+    <div>
+      <p class="eyebrow">Expense record</p>
+      <h2 id="expense-modal-title">Add an expense</h2>
+    </div>
+    <form method="post" action="{{ url_for('dismiss_expense_modal') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="expense-modal-close" type="submit" aria-label="Close Add Expense">×</button>
+    </form>
+  </div>
+
+  {% if modal_errors %}
+  <div class="expense-modal-errors" role="alert">
+    {% for error in modal_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  <form class="expense-modal-form" method="post" action="{{ url_for('add_expense') }}" data-modal-expense-form>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="intent" value="modal_save">
+    <div class="field">
+      <label for="modal-amount">Amount <span class="required-mark">*</span></label>
+      <div class="amount-input">
+        <span aria-hidden="true">₹</span>
+        <input id="modal-amount" name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" required value="{{ expense.amount }}" placeholder="0.00">
+      </div>
+    </div>
+    <div class="field">
+      <label for="modal-category">Category <span class="required-mark">*</span></label>
+      <select id="modal-category" name="category_id" required data-modal-category>
+        <option value="">Choose a category</option>
+        {% for category in categories %}
+        <option value="{{ category.id }}" {% if expense.category_id|string == category.id|string %}selected{% endif %}>{{ category.name }}</option>
+        {% endfor %}
+        <option value="__new__" {% if expense.category_id == '__new__' %}selected{% endif %}>+ Add category...</option>
+      </select>
+    </div>
+    <div class="field" data-modal-new-category-field {% if expense.category_id != '__new__' %}hidden{% endif %}>
+      <label for="modal-new-category">New category <span class="required-mark">*</span></label>
+      <input id="modal-new-category" name="new_category" type="text" value="{{ expense.new_category }}" {% if expense.category_id == '__new__' %}required{% endif %}>
+    </div>
+    <div class="field">
+      <span class="field-label">Date <span class="required-mark">*</span></span>
+      <div class="date-filter-options add-expense-date-options" role="group" aria-label="Expense date">
+        <button class="date-filter-option is-active" type="button" data-modal-date-period="today" aria-pressed="true">Today</button>
+        <button class="date-filter-option" type="button" data-modal-date-period="yesterday" aria-pressed="false">Yesterday</button>
+        <button class="date-filter-option" type="button" data-modal-date-period="last7" aria-pressed="false">−7 days</button>
+        <label class="date-picker-option" for="modal-expense-date">
+          <span class="visually-hidden">Custom date</span>
+          <input id="modal-expense-date" name="expense_date" type="date" required max="{{ today }}" value="{{ expense.expense_date }}" aria-label="Choose expense date" data-modal-date-picker>
+          <svg class="date-picker-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M7.5 3v4M16.5 3v4M4 9.5h16M8 13h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01"/></svg>
+        </label>
+      </div>
+    </div>
+    <div class="field">
+      <label for="modal-description">Description <span class="optional-mark">Optional</span></label>
+      <textarea id="modal-description" name="description" rows="2" placeholder="What was this expense for?">{{ expense.description }}</textarea>
+    </div>
+    <div class="form-actions">
+      <button class="button button-primary" type="submit">Save expense</button>
+    </div>
+  </form>
+
+  {% if modal_success %}
+  <div class="expense-save-success" role="alertdialog" aria-modal="true" aria-labelledby="expense-save-success-title" data-expense-save-success>
+    <div>
+      <span class="empty-mark" aria-hidden="true">✓</span>
+      <p id="expense-save-success-title">Expense saved successfully.</p>
+      <button class="button button-primary" type="button" data-confirm-expense-save>OK</button>
+    </div>
+  </div>
+  {% endif %}
+</dialog>
