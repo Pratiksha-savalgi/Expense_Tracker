@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#1e3129">
-  <title>{% block title %}Expense Tracker{% endblock %} | Ledger</title>
+  <title>{% block title %}Expense Tracker{% endblock %} | SpendWise</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <script src="{{ url_for('static', filename='script.js') }}" defer></script>
 </head>
@@ -12,9 +12,9 @@
   {% if session.get('user_id') %}
   <div class="app-frame">
     <aside class="side-nav" aria-label="Main navigation">
-      <a class="brand" href="{{ url_for('dashboard') }}" aria-label="Ledger dashboard">
+      <a class="brand" href="{{ url_for('dashboard') }}" aria-label="SpendWise dashboard">
         <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7.5h14a2 2 0 0 1 2 2V19H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14v4.5"/><path d="M20 11h-4a2 2 0 0 0 0 4h4z"/><path d="M16 13h.01"/></svg></span>
-        <span>Spendwise</span>
+        <span>SpendWise</span>
       </a>
       <nav class="side-links">
         <a class="side-link {% if request.endpoint == 'dashboard' %}is-active{% endif %}" href="{{ url_for('dashboard') }}">
@@ -41,9 +41,9 @@
     <div class="app-content">
   {% else %}
   <header class="site-header">
-    <a class="brand" href="{{ url_for('dashboard') if session.get('user_id') else url_for('login') }}" aria-label="Ledger home">
-      <span class="brand-mark" aria-hidden="true">L</span>
-      <span>ledger<span class="brand-period">.</span></span>
+    <a class="brand" href="{{ url_for('dashboard') if session.get('user_id') else url_for('login') }}" aria-label="SpendWise home">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7.5h14a2 2 0 0 1 2 2V19H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14v4.5"/><path d="M20 11h-4a2 2 0 0 0 0 4h4z"/><path d="M16 13h.01"/></svg></span>
+      <span>SpendWise<span class="brand-period">.</span></span>
     </a>
     {% if session.get('user_id') %}
     <nav class="primary-nav" aria-label="Main navigation">
@@ -77,6 +77,7 @@
   </main>
 
   {% if session.get('user_id') %}
+      {% include "_add_expense_modal.html" %}
       <footer class="site-footer">A quieter view of your everyday spending.</footer>
     </div>
   </div>

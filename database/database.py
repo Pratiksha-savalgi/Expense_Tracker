@@ -10,18 +10,53 @@ DATABASE_PATH = os.environ.get(
     str(PROJECT_ROOT / "database" / "expenses.sqlite3"),
 )
 
-DEFAULT_CATEGORIES = (
-    "Food",
-    "Utilities",
-    "Transport",
-    "Household",
-    "Health",
-    "Shopping",
-    "Education",
-    "Entertainment",
-    "Bills",
-    "Other",
-)
+DEFAULT_CATEGORIES_BY_ROLE = {
+    "Student": (
+        "Education",
+        "Hostel / Rent",
+        "Food & Dining",
+        "Transportation",
+        "Mobile & Internet",
+        "Books & Stationery",
+        "Entertainment",
+        "Shopping",
+        "Personal Care",
+        "Healthcare",
+        "Gifts",
+        "Other",
+    ),
+    "Homemaker": (
+        "Groceries",
+        "Household",
+        "Utilities",
+        "Food & Dining",
+        "Healthcare",
+        "Children & Education",
+        "Transportation",
+        "Shopping",
+        "Personal Care",
+        "Gifts & Festivals",
+        "Domestic Help",
+        "Other",
+    ),
+    "Professional": (
+        "Rent / Housing",
+        "Food & Dining",
+        "Transportation",
+        "Utilities",
+        "Mobile & Internet",
+        "Work & Professional",
+        "Shopping",
+        "Entertainment",
+        "Healthcare",
+        "Personal Care",
+        "Travel",
+        "Subscriptions",
+        "Gifts",
+        "Other",
+    ),
+}
+USER_ROLES = tuple(DEFAULT_CATEGORIES_BY_ROLE)
 
 
 @contextmanager
@@ -47,16 +82,92 @@ def normalize_category_name(name):
     return " ".join(part[:1].upper() + part[1:].lower() for part in cleaned.split())
 
 
-def seed_default_categories(user_id):
-    with database_connection() as connection:
-        for category_name in DEFAULT_CATEGORIES:
-            category_display_name = normalize_category_name(category_name)
-            normalized_category = category_display_name.casefold()
-            connection.execute(
-                "INSERT INTO categories (user_id, name, normalized_name) VALUES (?, ?, ?) "
-                "ON CONFLICT(user_id, normalized_name) DO NOTHING",
-                (user_id, category_display_name, normalized_category),
+def seed_default_categories(connection, user_id, role=None):
+    if role is None:
+        user = connection.execute(
+            "SELECT role FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+        if user is None:
+            raise ValueError("Cannot seed categories for an unknown user.")
+        role = user["role"]
+    if role not in DEFAULT_CATEGORIES_BY_ROLE:
+        raise ValueError("Cannot seed categories for an invalid user role.")
+
+    for category_name in DEFAULT_CATEGORIES_BY_ROLE[role]:
+        category_display_name = normalize_category_name(category_name)
+        normalized_category = category_display_name.casefold()
+        connection.execute(
+            "INSERT INTO categories (user_id, name, normalized_name) VALUES (?, ?, ?) "
+            "ON CONFLICT(user_id, normalized_name) DO NOTHING",
+            (user_id, category_display_name, normalized_category),
+        )
+
+
+def migrate_users_table(connection):
+    schema_row = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'"
+    ).fetchone()
+    if schema_row is None:
+        return
+
+    user_columns = {
+        row["name"] for row in connection.execute("PRAGMA table_info(users)")
+    }
+    schema = schema_row["sql"] or ""
+    if "role" in user_columns and "COLLATE NOCASE" not in schema.upper():
+        return
+
+    connection.commit()
+    connection.execute("PRAGMA foreign_keys = OFF")
+    try:
+        connection.execute("BEGIN IMMEDIATE")
+        existing_migration_table = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'users_registration_migration'"
+        ).fetchone()
+        if existing_migration_table is not None:
+            raise RuntimeError("A registration schema migration table already exists.")
+
+        role_column = "role" if "role" in user_columns else (
+            "user_type" if "user_type" in user_columns else None
+        )
+        selected_role = role_column if role_column else "'Professional'"
+        existing_users = connection.execute(
+            "SELECT id, username, password_hash, " + selected_role + " AS saved_role FROM users"
+        ).fetchall()
+
+        connection.execute(
+            """
+            CREATE TABLE users_registration_migration (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL COLLATE BINARY UNIQUE,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL CHECK (role IN ('Student', 'Homemaker', 'Professional'))
             )
+            """
+        )
+        for user in existing_users:
+            role_value = user["saved_role"]
+            if role_value == "Working Professional":
+                role_value = "Professional"
+            if role_value not in DEFAULT_CATEGORIES_BY_ROLE:
+                role_value = "Professional"
+            connection.execute(
+                "INSERT INTO users_registration_migration (id, username, password_hash, role) "
+                "VALUES (?, ?, ?, ?)",
+                (user["id"], user["username"], user["password_hash"], role_value),
+            )
+
+        connection.execute("DROP TABLE users")
+        connection.execute(
+            "ALTER TABLE users_registration_migration RENAME TO users"
+        )
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.execute("PRAGMA foreign_keys = ON")
 
 
 def initialize_database():
@@ -65,8 +176,10 @@ def initialize_database():
             """
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE COLLATE NOCASE,
-                password_hash TEXT NOT NULL
+                username TEXT NOT NULL COLLATE BINARY UNIQUE,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'Professional'
+                    CHECK (role IN ('Student', 'Homemaker', 'Professional'))
             );
 
             CREATE TABLE IF NOT EXISTS categories (
@@ -115,6 +228,8 @@ def initialize_database():
                 ON budgets(user_id, year, month);
             """
         )
+
+        migrate_users_table(connection)
 
         expense_columns = {
             row["name"] for row in connection.execute("PRAGMA table_info(expenses)")

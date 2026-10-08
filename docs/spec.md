@@ -4,19 +4,24 @@ This specification describes the current implementation. [requirements.md](requi
 defines the product scope; this document defines its observable behavior and
 data rules.
 
-## Authentication and authorization
+### Authentication and authorization
 
-- Registration collects username, password, and password confirmation.
-- Usernames are stored uniquely with case-insensitive comparison.
-- Passwords are hashed before storage.
-- Login uses username and password. Invalid credentials produce an error.
+- Registration collects username, role-based access, password, and password confirmation.
+- Usernames are unique with regard to letter case (must be case sensitive).
+- Usernames must be 3–15 characters long, contain no spaces, and must include a combination of letters, numbers, and at least one allowed special character (`_` or `@`).
+- Usernames may contain uppercase letters, lowercase letters, numbers, underscores, and the at-rate symbol (`@`).
+- Passwords must be 8–36 characters long, contain no spaces, and must include a combination of uppercase letters, lowercase letters, numbers, and special symbols.
+- Passwords should not be common or easily guessable.
+- Password and password confirmation must match.
+- Users must not be allowed to copy and paste into the password and password confirmation fields.
+- The "Create Account" button must be enabled only when all registration conditions are met.
+- Login uses username and password. The "Sign In" button must be enabled only when all login conditions are met.
+- Invalid credentials produce an error.
 - Logout clears the session.
-- Dashboard, Expenses, Analytics, budget actions, and expense actions require a
-  valid signed-in user.
-- Every data operation is scoped to that user. A record belonging to another
-  user cannot be viewed, edited, or deleted through an identifier.
-- POST forms include a session CSRF token; requests without the valid token are
-  rejected.
+- A user must be signed in to access the Dashboard, Expenses, Analytics, and add expense or budget actions.
+- Every data operation is scoped to the signed-in user. A record belonging to another user cannot be viewed, edited, or deleted.
+- Each user can access only their own expenses, categories, and budgets.
+- POST forms include a session CSRF token; requests without the valid token are rejected.
 
 ## Expense data and behavior
 
@@ -34,61 +39,98 @@ API behavior, or database schema.
 
 ### Categories
 
-- Categories are user-owned records with a display name and normalized unique
-  name.
-- The seeded defaults are Food, Utilities, Transport, Household, Health,
-  Shopping, Education, Entertainment, Bills, and Other.
-- The form's custom-category option creates or reuses a normalized category
-  when a valid expense is saved.
-- Category normalization collapses whitespace and standardizes capitalization.
-- Legacy free-text expense categories are normalized and linked to a user-owned
-  category during database initialization without discarding expense rows.
+- Categories are user-owned records with a display name and normalized unique name.
+- Categories are automatically assigned based on the user's selected role during registration.
+
+### Default Categories by Role
+
+#### Student
+- Education
+- Hostel / Rent
+- Food & Dining
+- Transportation
+- Mobile & Internet
+- Books & Stationery
+- Entertainment
+- Shopping
+- Personal Care
+- Healthcare
+- Gifts
+- Other
+
+#### Homemaker
+- Groceries
+- Household
+- Utilities
+- Food & Dining
+- Healthcare
+- Children & Education
+- Transportation
+- Shopping
+- Personal Care
+- Gifts & Festivals
+- Domestic Help
+- Other
+
+#### Professional
+- Rent / Housing
+- Food & Dining
+- Transportation
+- Utilities
+- Mobile & Internet
+- Work & Professional
+- Shopping
+- Entertainment
+- Healthcare
+- Personal Care
+- Travel
+- Subscriptions
+- Gifts
+- Other
+
+### Constraints
+
+- Users can select only from categories available to their role.
+- A user's categories remain private and visible only to that user.
+- Category names are normalized by collapsing whitespace and standardizing capitalization.
 
 ### Create and edit
 
-- Create and edit forms default new expense dates to today and render a browser
-  maximum-date constraint.
-- JavaScript checks date input and provides immediate browser validation.
-- The backend independently parses and validates amount, category, and date
-  before saving.
-- Validation failures return the form with user feedback and preserve entered
-  values where possible.
-- Successful create/edit operations redirect to the Dashboard.
+- New expense dates default to today.
+- Expense dates must not be later than today.
+- The amount must be greater than zero and contain no more than two decimal places.
+- The selected category must belong to the signed-in user.
+- The description is optional.
+- The backend validates the expense details before saving.
+- Validation failures reopen the Add Expense popup with user feedback and
+  preserve entered values where possible.
+- Successful creation returns to the page where the popup was opened and shows
+  a confirmation. Successful edits follow the edit flow.
 
 ### List, filters, totals, analytics, and deletion
 
 - The Expenses page lists a user's records newest first, with amount, category,
   date, description, and edit/delete actions.
 - The Expenses page is the unfiltered ledger, optionally filtered by category.
-- The Add Expense page follows the AddExpense visual hierarchy: Amount,
-  Category and Date controls side by side, Description, and Save. The Date
-  controls provide Today, Yesterday, Last 7 Days, and a custom date picker.
-  Today is selected by default. The active date period drives both the date
-  used for the new expense and the existing-record preview; there is no second
-  transaction-date input or duplicate date filter.
-- Today saves today's date; Yesterday saves the previous calendar date; Last 7
-  Days saves today's date; Custom saves the selected date. The Category choice
-  is used both for the new expense and for the existing-record preview.
-- Today includes only today. Yesterday includes only the preceding calendar
-  day. Last 7 Days includes today and the preceding six calendar days. Custom
-  Date includes only the selected calendar date.
-- Selecting a date preset or changing category submits a filter-only request
-  immediately, preserves unsaved values, and never saves the expense. The
-  selected date and category update the existing-record preview and summary.
-- A custom date must be valid and not later than today. Invalid dates are
-  reported and the page safely falls back to Today.
-- The total, record count, average, highest-spending category, and category
-  breakdown on Add Expense are computed from the same filtered existing records.
-- Saving a new expense uses the selected period's corresponding date and
-  category, then refreshes matching existing records and summaries.
-- The selected date window is passed to Analytics. Analytics applies it to the
-  selected-period summary and category distribution; its existing current vs
-  previous full-month comparison remains unchanged.
-- Quick-filter active styling and accessible pressed state on Add Expense represent exactly
-  one selected period. Choosing a custom date clears the quick-filter active
-  state; choosing a quick filter clears custom selection state.
-- The integrated date controls wrap appropriately on tablet and mobile Add
-  Expense layouts.
+- Add Expense opens as a popup after login and from Add Expense actions on
+  authenticated pages; it does not navigate to a standalone entry page.
+- The popup contains Amount, a role-specific Category dropdown, Date controls,
+  optional Description, and Save. Subcategories and category creation are not
+  offered in this form.
+- The Date controls provide only Today, Yesterday, and a custom date picker.
+  Today is selected by default. Today saves today's date; Yesterday saves the
+  previous calendar date; Custom saves the selected calendar date.
+- Exactly one date option is active. Selecting a custom date clears the active
+  quick-filter state, and selecting a quick filter clears the custom-date state.
+- A category must be one of the signed-in user's default categories for their
+  registered role.
+- Validation failures reopen the popup with entered values and clear feedback.
+- A successful save displays a confirmation; acknowledging it leaves a blank
+  form ready for another expense.
+- A custom date must be valid and not later than today.
+- The popup remains usable on mobile, tablet, and desktop layouts.
+- Date controls expose the active preset through accessible pressed state and
+  visually distinguish the selected option.
 - Delete is a POST action with CSRF protection; JavaScript requests confirmation
   before submission. The backend scopes deletion to the signed-in user.
 

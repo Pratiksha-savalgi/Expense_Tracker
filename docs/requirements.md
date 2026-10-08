@@ -6,20 +6,28 @@ The Expense Tracker is a web application for individuals to record, organize,
 and review personal expenses. It also provides monthly budget tracking and
 category-based spending analytics.
 
-## Users and access
+### Users and access
 
-- A user can register with a username, password, and password confirmation.
-- Usernames are unique without regard to letter case.
-- A user signs in with their username and password, and can sign out.
+- A user can register with a username, role-based access, password, and password confirmation.
+- Usernames are unique with regard to letter case (must be case sensitive).
+- Usernames must be 3–15 characters long, contain no spaces, and must include a combination of letters, numbers, and at least one allowed special character (`_` or `@`).
+- Usernames may contain uppercase letters, lowercase letters, numbers, underscores, and the at-rate symbol (`@`).
+- Passwords must be 8–36 characters long, contain no spaces, and must include a combination of uppercase letters, lowercase letters, numbers, and special symbols.
+- Passwords should not be common or easily guessable.
+- Password and password confirmation must match.
+- Users must not be allowed to copy and paste into the password and password confirmation fields.
+- A user signs in with their username and password, they can sign out.
 - A user must be signed in to access the Dashboard, Expenses, Analytics, and
   expense or budget actions.
 - Each user can access only their own expenses, categories, and budgets.
+- The "Create Account" button must be enabled only when all the conditions are met.
+- The "Sign In" button must be enabled nly when all the conditions are met in the Login Page.
 
-### User Types
+### Role
 
 - Student
 - Homemaker
-- Working Professional
+- Professional
 
 - A user must select a user type during registration.
 - The selected user type is stored in the user's profile.
@@ -31,37 +39,53 @@ category-based spending analytics.
 #### Student
 
 - Education
-- Books
-- Transport
-- Food
+- Hostel / Rent
+- Food & Dining
+- Transportation
+- Mobile & Internet
+- Books & Stationery
 - Entertainment
-- Mobile Recharge
+- Shopping
+- Personal Care
+- Healthcare
+- Gifts
 - Other
 
 #### Homemaker
 
 - Groceries
-- Utilities
 - Household
-- Health
-- Education
-- Bills
+- Utilities
+- Food & Dining
+- Healthcare
+- Children & Education
+- Transportation
+- Shopping
+- Personal Care
+- Gifts & Festivals
+- Domestic Help
 - Other
 
-#### Working Professional
+#### Professional
 
-- Food
-- Transport
-- Bills
+- Rent / Housing
+- Food & Dining
+- Transportation
+- Utilities
+- Mobile & Internet
+- Work & Professional
 - Shopping
-- Health
-- Investments
 - Entertainment
+- Healthcare
+- Personal Care
+- Travel
+- Subscriptions
+- Gifts
 - Other
 
 ### Constraints
 
-- Users can select only from categories available to their user type.
+- Users can select only from categories available to their role.
 - Categories are automatically assigned when a user registers.
 - A user's categories remain private and visible only to that user.
 
@@ -69,7 +93,7 @@ category-based spending analytics.
 
 An expense consists of:
 
-- A positive amount, entered with no more than two decimal places
+- A positive amount and must be greater than zero, entered with no more than two decimal places
 - One category owned by the signed-in user
 - A date that is not later than today
 - An optional description
@@ -77,9 +101,6 @@ An expense consists of:
 Users can add, view, edit, and delete their own expenses. The date defaults to
 today when creating an expense. Deletion requires browser confirmation.
 
-The application does not have subcategories or an expense-type classification.
-Neither is collected, displayed, filtered, validated, or stored as part of the
-current expense workflow.
 
 
 
@@ -88,27 +109,23 @@ current expense workflow.
 - The Expenses page shows amount, category, date, and description.
 - Records are shown newest first.
 - The Expenses page provides the unfiltered expense ledger and category filter.
-- The Add Expense page uses the AddExpense visual hierarchy: Amount spans the
-  form; Category and Date controls share a row; Description and Save follow.
-- The Date controls provide Today, Yesterday and a custom date picker. Today is selected by default.  - This single selected period controls the existing-record preview and the date saved for the new
-  expense.
-- Today saves today's date; Yesterday saves yesterday's date Custom saves the selected calendar date.
+- Add Expense opens as a popup after login and from Add Expense actions on
+  authenticated pages; it does not navigate to a standalone entry page.
+- The popup contains Amount, a role-specific Category dropdown, Date controls,
+  optional Description, and Save. Subcategories and category creation are not
+  offered in this form.
+- The Date controls provide only Today, Yesterday, and a custom date picker.
+  Today is selected by default. Today saves today's date; Yesterday saves the
+  previous calendar date; Custom saves the selected calendar date.
 - Exactly one date option is active. Selecting a custom date clears the active
   quick-filter state, and selecting a quick filter clears the custom-date state.
-- The Category choice is the category for the new expense and filters the
-  existing-record preview and analytics; no duplicate category filter is shown.
-- The filtered total, record count, summary values, category analytics, and
-  existing-expense list on the Add Expense page reflect the selected period
-  and category.
-- Changing a filter preserves the unsaved form values and does not save an
-  expense. Saving refreshes the preview with the same selected filters.
+- A category must be one of the signed-in user's default categories for their
+  registered role.
+- Validation failures reopen the popup with entered values and clear feedback.
+- A successful save displays a confirmation; acknowledging it leaves a blank
+  form ready for another expense.
 - A custom date must be a valid date no later than today.
-- Changing a date or category filter automatically refreshes the existing
-  expense list, summary values, and category analytics.
-- The selected date window can be opened in Analytics; Analytics applies it to
-  the selected-period summary and category distribution.
-- The integrated form remains usable on the Add Expense page on mobile, tablet,
-  and desktop layouts.
+- The popup remains usable on mobile, tablet, and desktop layouts.
 
 
 
@@ -206,13 +223,15 @@ current expense workflow.
 
 ### Add Expense
 
+- The popup opens after login and from authenticated Add Expense actions.
 - A valid expense can be created successfully.
 - Amounts must be positive and contain no more than two decimal places.
 - Future dates are rejected.
-- Only categories belonging to the signed-in user can be selected.
+- Only the signed-in user's role-specific default categories can be selected.
+- The date choices are Today, Yesterday, and Custom; there is no Last 7 Days
+  option or subcategory field.
 - A success message is displayed after saving an expense.
 - After successful save and acknowledgment, the expense form resets for a new entry.
-- Active filters remain unchanged after saving.
 
 ### Expense Management
 
@@ -224,10 +243,10 @@ current expense workflow.
 
 ### Expense Filters
 
-- Category filtering returns only matching user-owned expenses.
-- Date quick filters (Today, Yesterday, Last 7 Days) return correct results.
-- Custom date filtering returns correct results.
-- Summary values and expense previews update automatically when filters change.
+- Category and date filters on the Expenses page return matching user-owned
+  expenses.
+- Date choices (Today, Yesterday, and Custom) save the correct date.
+- Custom dates are validated and cannot be later than today.
 - Invalid dates and future dates are rejected.
 
 ### Dashboard

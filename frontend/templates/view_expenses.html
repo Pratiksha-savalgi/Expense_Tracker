@@ -7,7 +7,7 @@
     <h1>Expenses</h1>
     <p class="page-lede">A clear view of what you have spent.</p>
   </div>
-  <a class="button button-primary" href="{{ url_for('add_expense') }}"><span class="plus-mark" aria-hidden="true">+</span> Add expense</a>
+  <button class="button button-primary" type="button" data-open-expense-modal><span class="plus-mark" aria-hidden="true">+</span> Add expense</button>
 </section>
 
 <section class="overview-row" aria-label="Expense total and category filter">
@@ -67,7 +67,7 @@
   <div class="empty-state">
     <span class="empty-mark" aria-hidden="true">+</span>
     {% if category_filter or date_filter %}<h3>No matching expenses</h3><p>Try another filter or clear the filters.</p><a class="button button-outline" href="{{ url_for('expenses') }}">Clear filters</a>
-    {% else %}<h3>Your ledger starts here</h3><p>Add an expense and it will appear here for you to review.</p><a class="button button-primary" href="{{ url_for('add_expense') }}">Add your first expense</a>{% endif %}
+    {% else %}<h3>Your ledger starts here</h3><p>Add an expense and it will appear here for you to review.</p><button class="button button-primary" type="button" data-open-expense-modal>Add your first expense</button>{% endif %}
   </div>
   {% endif %}
 </section>

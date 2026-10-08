@@ -20,41 +20,198 @@ document.addEventListener("click", (event) => {
   toggle.title = label;
 });
 
-const registrationForm = document.querySelector("[data-password-confirm]");
+const registrationForm = document.querySelector("[data-registration-form]");
 if (registrationForm) {
+  const usernameInput = registrationForm.querySelector("#username");
+  const roleSelect = registrationForm.querySelector("#role");
   const passwordInput = registrationForm.querySelector("#password");
   const confirmationInput = registrationForm.querySelector("#confirm_password");
-  const validatePasswordMatch = () => {
-    const mismatch = confirmationInput.value && passwordInput.value !== confirmationInput.value;
-    confirmationInput.setCustomValidity(mismatch ? "Passwords do not match." : "");
+  const feedback = registrationForm.querySelector("[data-registration-feedback]");
+  const submitButton = registrationForm.querySelector('button[type="submit"]');
+  const errorElements = Object.fromEntries(
+    [...registrationForm.querySelectorAll("[data-registration-error]")].map((element) => [
+      element.dataset.registrationError,
+      element,
+    ]),
+  );
+  const touchedFields = new Set();
+  const usernamePattern = /^(?=.*[A-Za-z])(?=.*[0-9])(?=.*[_@])[A-Za-z0-9_@]{3,15}$/;
+  const passwordPattern = /^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s])\S{8,36}$/;
+  const commonPasswords = new Set([
+    "password123!",
+    "password1!",
+    "qwerty123!",
+    "letmein123!",
+    "welcome123!",
+    "admin123!",
+    "iloveyou1!",
+    "changeme123!",
+    "p@ssw0rd123!",
+    "qwertyuiop1!",
+  ]);
+
+  const validateRegistration = () => {
+    const username = usernameInput.value;
+    const password = passwordInput.value;
+    const confirmation = confirmationInput.value;
+    const errors = {
+      username: "",
+      role: "",
+      password: "",
+      confirm_password: "",
+    };
+
+    if (!username) {
+      errors.username = "Enter a username.";
+    } else if (!usernamePattern.test(username)) {
+      errors.username = "Use 3–15 letters, numbers, underscores, or @, including at least one letter, one number, and one underscore or @.";
+    }
+
+    if (!roleSelect.value) {
+      errors.role = "Choose your role.";
+    }
+
+    if (!password) {
+      errors.password = "Enter a password.";
+    } else if (!passwordPattern.test(password)) {
+      errors.password = "Use 8–36 characters with uppercase and lowercase letters, a number, and a symbol. Spaces are not allowed.";
+    } else if (commonPasswords.has(password.toLowerCase())) {
+      errors.password = "Choose a less common password.";
+    }
+
+    if (!confirmation) {
+      errors.confirm_password = "Confirm your password.";
+    } else if (password !== confirmation) {
+      errors.confirm_password = "Passwords do not match.";
+    }
+
+    const fields = {
+      username: usernameInput,
+      role: roleSelect,
+      password: passwordInput,
+      confirm_password: confirmationInput,
+    };
+    Object.entries(fields).forEach(([name, field]) => {
+      const errorElement = errorElements[name];
+      const submittedValue = errorElement.dataset.serverValue;
+      const serverError = errorElement.dataset.serverError;
+      const currentValue = field.value;
+      if (!errors[name] && serverError && currentValue === submittedValue) {
+        errors[name] = serverError;
+      } else if (currentValue !== submittedValue) {
+        errorElement.dataset.serverError = "";
+      }
+
+      const shouldShowError = Boolean(errors[name]) && (
+        touchedFields.has(name) || Boolean(errorElement.dataset.serverError)
+      );
+      errorElement.textContent = shouldShowError ? errors[name] : "";
+      errorElement.hidden = !shouldShowError;
+      field.setAttribute("aria-invalid", String(shouldShowError));
+    });
+
+    const hasErrors = Object.values(errors).some(Boolean);
+    submitButton.disabled = hasErrors;
+    feedback.classList.toggle("has-errors", hasErrors);
+    feedback.textContent = hasErrors
+      ? "Complete the highlighted fields to enable account creation."
+      : "All set. You can create your account.";
   };
 
-  passwordInput.addEventListener("input", validatePasswordMatch);
-  confirmationInput.addEventListener("input", validatePasswordMatch);
+  [
+    ["username", usernameInput],
+    ["role", roleSelect],
+    ["password", passwordInput],
+    ["confirm_password", confirmationInput],
+  ].forEach(([name, input]) => {
+    input.addEventListener("input", () => {
+      touchedFields.add(name);
+      validateRegistration();
+    });
+    input.addEventListener("change", () => {
+      touchedFields.add(name);
+      validateRegistration();
+    });
+    input.addEventListener("blur", () => {
+      touchedFields.add(name);
+      validateRegistration();
+    });
+  });
+  [passwordInput, confirmationInput].forEach((input) => {
+    input.addEventListener("paste", (event) => event.preventDefault());
+  });
+  registrationForm.addEventListener("submit", (event) => {
+    touchedFields.add("username");
+    touchedFields.add("role");
+    touchedFields.add("password");
+    touchedFields.add("confirm_password");
+    validateRegistration();
+    if (submitButton.disabled) event.preventDefault();
+  });
+  validateRegistration();
+}
+
+const loginForm = document.querySelector("[data-login-form]");
+if (loginForm) {
+  const usernameInput = loginForm.querySelector("#username");
+  const passwordInput = loginForm.querySelector("#password");
+  const submitButton = loginForm.querySelector('button[type="submit"]');
+  const fields = { username: usernameInput, password: passwordInput };
+  const errorElements = Object.fromEntries(
+    [...loginForm.querySelectorAll("[data-login-error]")].map((element) => [
+      element.dataset.loginError,
+      element,
+    ]),
+  );
+  const touchedFields = new Set(
+    Object.entries(errorElements)
+      .filter(([, element]) => !element.hidden)
+      .map(([name]) => name),
+  );
+
+  const validateLogin = () => {
+    Object.entries(fields).forEach(([name, field]) => {
+      const errorElement = errorElements[name];
+      const message = field.value ? "" : `Enter your ${name === "username" ? "username" : "password"}.`;
+      const showError = !field.value && touchedFields.has(name);
+      errorElement.textContent = showError ? message : "";
+      errorElement.hidden = !showError;
+      field.setAttribute("aria-invalid", String(showError));
+    });
+
+    submitButton.disabled = !usernameInput.value || !passwordInput.value;
+  };
+
+  Object.entries(fields).forEach(([name, field]) => {
+    ["input", "change", "blur"].forEach((eventName) => {
+      field.addEventListener(eventName, () => {
+        if (eventName === "blur" || field.value) touchedFields.add(name);
+        validateLogin();
+      });
+    });
+  });
+  loginForm.addEventListener("submit", (event) => {
+    touchedFields.add("username");
+    touchedFields.add("password");
+    validateLogin();
+    if (submitButton.disabled) event.preventDefault();
+  });
+  validateLogin();
 }
 
 const expenseModal = document.querySelector("[data-expense-modal]");
 if (expenseModal) {
   const modalForm = expenseModal.querySelector("[data-modal-expense-form]");
-  const categorySelect = expenseModal.querySelector("[data-modal-category]");
-  const newCategoryField = expenseModal.querySelector("[data-modal-new-category-field]");
-  const newCategoryInput = newCategoryField.querySelector("input");
   const modalDatePicker = expenseModal.querySelector("[data-modal-date-picker]");
+  const modalPeriodInput = expenseModal.querySelector("[data-modal-date-period-value]");
   const modalDatePeriodButtons = expenseModal.querySelectorAll("[data-modal-date-period]");
   const successMessage = expenseModal.querySelector("[data-expense-save-success]");
   const saveConfirmation = expenseModal.querySelector("[data-confirm-expense-save]");
 
-  const toIsoDate = (value) => {
-    const localDate = new Date(value.getTime() - (value.getTimezoneOffset() * 60000));
-    return localDate.toISOString().split("T")[0];
-  };
-  const todayIso = () => toIsoDate(new Date());
-  const yesterdayIso = () => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    return toIsoDate(yesterday);
-  };
+  const todayIso = () => expenseModal.dataset.today;
+  const yesterdayIso = () => expenseModal.dataset.yesterday;
   const setActiveDatePeriod = (period) => {
+    modalPeriodInput.value = period;
     modalDatePeriodButtons.forEach((button) => {
       const isActive = button.dataset.modalDatePeriod === period;
       button.classList.toggle("is-active", isActive);
@@ -62,27 +219,7 @@ if (expenseModal) {
     });
     modalDatePicker.closest(".date-picker-option").classList.toggle("is-active", period === "custom");
   };
-  const syncActiveDatePeriod = () => {
-    const selectedDate = modalDatePicker.value;
-    const today = todayIso();
-    if (selectedDate === today) {
-      setActiveDatePeriod("today");
-    } else if (selectedDate === yesterdayIso()) {
-      setActiveDatePeriod("yesterday");
-    } else {
-      const lastSevenDays = new Date();
-      lastSevenDays.setDate(lastSevenDays.getDate() - 6);
-      setActiveDatePeriod(selectedDate >= toIsoDate(lastSevenDays) && selectedDate <= today ? "last7" : "custom");
-    }
-  };
-  const updateNewCategoryField = () => {
-    const addingCategory = categorySelect.value === "__new__";
-    newCategoryField.hidden = !addingCategory;
-    newCategoryInput.required = addingCategory;
-    if (!addingCategory) newCategoryInput.value = "";
-  };
 
-  categorySelect.addEventListener("change", updateNewCategoryField);
   modalDatePicker.max = todayIso();
   modalDatePeriodButtons.forEach((button) => {
     button.addEventListener("click", () => {
@@ -91,9 +228,12 @@ if (expenseModal) {
       setActiveDatePeriod(period);
     });
   });
-  modalDatePicker.addEventListener("change", () => setActiveDatePeriod("custom"));
-  setActiveDatePeriod("today");
-  updateNewCategoryField();
+  modalDatePicker.addEventListener("click", () => {
+    setActiveDatePeriod("custom");
+  });
+  modalDatePicker.addEventListener("change", () => {
+    if (modalDatePicker.value) setActiveDatePeriod("custom");
+  });
 
   modalForm.addEventListener("submit", (event) => {
     const amountInput = modalForm.querySelector("#modal-amount");
@@ -105,6 +245,12 @@ if (expenseModal) {
       amountInput.setCustomValidity("Amount must use no more than two decimal places.");
     } else {
       amountInput.setCustomValidity("");
+    }
+
+    if (!modalDatePicker.value || modalDatePicker.value > todayIso()) {
+      modalDatePicker.setCustomValidity("Choose a valid date no later than today.");
+    } else {
+      modalDatePicker.setCustomValidity("");
     }
 
     if (!modalForm.reportValidity()) event.preventDefault();
@@ -119,8 +265,10 @@ if (expenseModal) {
       successMessage.hidden = true;
       modalForm.reset();
       modalForm.querySelector("#modal-amount").setCustomValidity("");
-      updateNewCategoryField();
-      syncActiveDatePeriod();
+      modalDatePicker.setCustomValidity("");
+      modalDatePicker.max = todayIso();
+      modalDatePicker.value = todayIso();
+      setActiveDatePeriod("today");
       modalForm.querySelector("#modal-amount").focus();
     });
   } else if (modalForm.querySelector("#modal-amount").value) {

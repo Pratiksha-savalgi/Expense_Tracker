@@ -10,9 +10,9 @@
       <h1>Dashboard</h1>
       <p class="page-lede">An overview of your recorded expenses.</p>
     </div>
-    <a class="button button-primary dashboard-add-button" href="{{ url_for('add_expense') }}">
+    <button class="button button-primary dashboard-add-button" type="button" data-open-expense-modal>
       <span aria-hidden="true">+</span> Add Expense
-    </a>
+    </button>
   </section>
 
   <section class="dashboard-budget-card" aria-labelledby="budget-panel-title">

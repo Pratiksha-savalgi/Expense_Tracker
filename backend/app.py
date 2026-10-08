@@ -7,13 +7,35 @@ import re
 import secrets
 import sqlite3
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from flask import Flask, abort, flash, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from database.database import database_connection, initialize_database, normalize_category_name, seed_default_categories
+from database.database import (
+    USER_ROLES,
+    DEFAULT_CATEGORIES_BY_ROLE,
+    database_connection,
+    initialize_database,
+    normalize_category_name,
+    seed_default_categories,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+USERNAME_PATTERN = re.compile(r"(?=.*[A-Za-z])(?=.*[0-9])(?=.*[_@])[A-Za-z0-9_@]{3,15}")
+PASSWORD_PATTERN = re.compile(r"(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s])\S{8,36}")
+COMMON_PASSWORDS = {
+    "password123!",
+    "password1!",
+    "qwerty123!",
+    "letmein123!",
+    "welcome123!",
+    "admin123!",
+    "iloveyou1!",
+    "changeme123!",
+    "p@ssw0rd123!",
+    "qwertyuiop1!",
+}
 
 
 def load_or_create_secret_key(path):
@@ -60,10 +82,36 @@ def format_money(value):
 
 @app.context_processor
 def template_helpers():
-    return {
+    template_context = {
         "csrf_token": csrf_token,
         "format_money": format_money,
     }
+    user_id = session.get("user_id")
+    if user_id is None:
+        return template_context
+
+    current_date = date.today()
+    today = current_date.isoformat()
+    template_context.update({
+        "modal_categories": get_user_role_categories(user_id),
+        "modal_expense": session.pop("modal_expense", {
+            "amount": "",
+            "category_id": "",
+            "expense_date": today,
+            "description": "",
+            "date_period": "today",
+        }),
+        "modal_errors": session.pop("modal_errors", []),
+        "modal_success": session.pop("modal_success", False),
+        "show_expense_modal": session.pop("show_add_expense_modal", False),
+        "modal_return_to": session.pop(
+            "modal_return_to",
+            request.full_path.rstrip("?"),
+        ),
+        "today": today,
+        "yesterday": date.fromordinal(current_date.toordinal() - 1).isoformat(),
+    })
+    return template_context
 
 
 @app.before_request
@@ -99,8 +147,8 @@ def login_required(view):
 
 
 def get_user_categories(user_id):
-    seed_default_categories(user_id)
     with database_connection() as connection:
+        seed_default_categories(connection, user_id)
         category_rows = connection.execute(
             "SELECT id, name FROM categories WHERE user_id = ? ORDER BY name COLLATE NOCASE",
             (user_id,),
@@ -117,6 +165,38 @@ def get_user_categories(user_id):
                 "subcategories": [dict(row) for row in subcategories],
             })
     return categories
+
+
+def get_user_role_categories(user_id):
+    with database_connection() as connection:
+        user = connection.execute(
+            "SELECT role FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+        if user is None:
+            raise ValueError("Cannot load categories for an unknown user.")
+        role_categories = DEFAULT_CATEGORIES_BY_ROLE.get(user["role"])
+        if role_categories is None:
+            raise ValueError("Cannot load categories for an invalid user role.")
+
+        seed_default_categories(connection, user_id, user["role"])
+        placeholders = ", ".join("?" for _ in role_categories)
+        rows = connection.execute(
+            "SELECT id, name FROM categories "
+            f"WHERE user_id = ? AND name IN ({placeholders}) "
+            "ORDER BY CASE WHEN name = 'Other' THEN 1 ELSE 0 END, name COLLATE NOCASE",
+            (user_id, *role_categories),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def safe_return_path(path):
+    if not path or not path.startswith("/") or path.startswith("//") or "\\" in path:
+        return url_for("dashboard")
+    parsed = urlsplit(path)
+    if parsed.scheme or parsed.netloc or parsed.path == url_for("add_expense"):
+        return url_for("dashboard")
+    return path
 
 
 def parse_expense_form(form, user_id):
@@ -567,54 +647,99 @@ def home():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
+        username = request.form.get("username", "")
+        role = request.form.get("role", "").strip()
         password = request.form.get("password", "")
         confirm_password = request.form.get("confirm_password", "")
-        errors = []
+        registration_errors = {}
         if not username:
-            errors.append("Username is required.")
+            registration_errors["username"] = "Enter a username."
+        elif not USERNAME_PATTERN.fullmatch(username):
+            registration_errors["username"] = (
+                "Use 3–15 letters, numbers, underscores, or @, including at least "
+                "one letter, one number, and one underscore or @."
+            )
+        if role not in USER_ROLES:
+            registration_errors["role"] = "Choose your role."
         if not password:
-            errors.append("Password is required.")
+            registration_errors["password"] = "Enter a password."
+        elif not PASSWORD_PATTERN.fullmatch(password):
+            registration_errors["password"] = (
+                "Use 8–36 characters with uppercase and lowercase letters, a number, "
+                "and a symbol. Spaces are not allowed."
+            )
+        elif password.casefold() in COMMON_PASSWORDS:
+            registration_errors["password"] = "Choose a less common password."
         if not confirm_password:
-            errors.append("Confirm your password.")
+            registration_errors["confirm_password"] = "Confirm your password."
         elif password != confirm_password:
-            errors.append("Passwords do not match.")
+            registration_errors["confirm_password"] = "Passwords do not match."
 
-        if errors:
-            for error in errors:
-                flash(error, "error")
-            return render_template("register.html", username=username), 400
+        if registration_errors:
+            return render_template(
+                "register.html",
+                username=username,
+                role=role,
+                registration_errors=registration_errors,
+            ), 400
 
         try:
             with database_connection() as connection:
-                connection.execute(
-                    "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                    (username, generate_password_hash(password)),
+                cursor = connection.execute(
+                    "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
+                    (username, generate_password_hash(password), role),
                 )
+                seed_default_categories(connection, cursor.lastrowid, role)
         except sqlite3.IntegrityError:
-            flash("That username is already taken.", "error")
-            return render_template("register.html", username=username), 409
+            registration_errors["username"] = "That username is already taken."
+            return render_template(
+                "register.html",
+                username=username,
+                role=role,
+                registration_errors=registration_errors,
+            ), 409
 
         flash("Account created. Sign in to continue.", "success")
         return redirect(url_for("login"))
 
-    return render_template("register.html", username="")
+    return render_template(
+        "register.html",
+        username="",
+        role="",
+        registration_errors={},
+    )
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
+        username = request.form.get("username", "")
         password = request.form.get("password", "")
+        login_errors = {}
+        if not username:
+            login_errors["username"] = "Enter your username."
+        if not password:
+            login_errors["password"] = "Enter your password."
+        if login_errors:
+            return render_template(
+                "login.html",
+                username=username,
+                login_errors=login_errors,
+            ), 400
+
         with database_connection() as connection:
             user = connection.execute(
-                "SELECT id, username, password_hash FROM users WHERE username = ? COLLATE NOCASE",
+                "SELECT id, username, password_hash FROM users WHERE username = ?",
                 (username,),
             ).fetchone()
 
         if user is None or not check_password_hash(user["password_hash"], password):
-            flash("Username or password is incorrect.", "error")
-            return render_template("login.html", username=username), 401
+            return render_template(
+                "login.html",
+                username=username,
+                login_errors={},
+                login_error="Username or password is incorrect. Check your details and try again.",
+            ), 401
 
         session.clear()
         session["user_id"] = user["id"]
@@ -623,7 +748,7 @@ def login():
         csrf_token()
         return redirect(url_for("dashboard"))
 
-    return render_template("login.html", username="")
+    return render_template("login.html", username="", login_errors={})
 
 
 @app.post("/logout")
@@ -637,9 +762,13 @@ def logout():
 @app.post("/expenses/modal/dismiss")
 @login_required
 def dismiss_expense_modal():
+    return_to = safe_return_path(request.form.get("return_to", ""))
     session["show_add_expense_modal"] = False
-    session.pop("expense_save_success", None)
-    return redirect(url_for("dashboard"))
+    session.pop("modal_expense", None)
+    session.pop("modal_errors", None)
+    session.pop("modal_success", None)
+    session.pop("modal_return_to", None)
+    return redirect(return_to)
 
 
 def _render_dashboard(expense=None, modal_errors=None, modal_success=False, status=200):
@@ -942,143 +1071,90 @@ def save_budget():
 @login_required
 def add_expense():
     today = date.today()
-    categories = get_user_categories(session["user_id"])
-    valid_category_ids = {str(category["id"]) for category in categories}
-    values = {
+    return_to = safe_return_path(request.form.get("return_to", ""))
+
+    if request.method == "GET":
+        session["show_add_expense_modal"] = True
+        return redirect(url_for("dashboard"))
+
+    user_id = session["user_id"]
+    categories = get_user_role_categories(user_id)
+    allowed_category_ids = {str(category["id"]) for category in categories}
+    amount_text = request.form.get("amount", "").strip()
+    category_id = request.form.get("category_id", "").strip()
+    description = request.form.get("description", "").strip()
+    date_period = request.form.get("date_period", "").strip()
+    submitted_date = request.form.get("expense_date", "").strip()
+    errors = []
+
+    if date_period == "today":
+        expense_date = today
+    elif date_period == "yesterday":
+        expense_date = date.fromordinal(today.toordinal() - 1)
+    elif date_period == "custom":
+        try:
+            expense_date = date.fromisoformat(submitted_date)
+            if expense_date.isoformat() != submitted_date or expense_date > today:
+                raise ValueError
+        except ValueError:
+            expense_date = today
+            errors.append("Choose a valid custom date no later than today.")
+    else:
+        expense_date = today
+        errors.append("Choose Today, Yesterday, or a valid custom date.")
+
+    amount_format_invalid = bool(
+        amount_text
+        and not re.fullmatch(r"(?:\d+(?:\.\d{1,2})?|\.\d{1,2})", amount_text)
+    )
+    if amount_format_invalid:
+        errors.append("Enter a positive amount with no more than two decimal places.")
+    category_invalid = category_id not in allowed_category_ids
+    if category_invalid:
+        errors.append("Choose a category assigned to your role.")
+
+    form_data = {
+        "amount": amount_text,
+        "category_id": category_id,
+        "expense_date": expense_date.isoformat(),
+        "description": description,
+    }
+    values, validation_errors = parse_expense_form(form_data, user_id)
+    for error in validation_errors:
+        if amount_format_invalid and error.startswith(("Enter a valid amount", "Amount must")):
+            continue
+        if category_invalid and error.startswith(("Choose a valid category", "Choose a category or")):
+            continue
+        errors.append(error)
+    errors = list(dict.fromkeys(errors))
+
+    session["modal_return_to"] = return_to
+    if errors:
+        session["modal_expense"] = {
+            "amount": amount_text,
+            "category_id": category_id,
+            "expense_date": submitted_date if date_period == "custom" else expense_date.isoformat(),
+            "description": description,
+            "date_period": date_period if date_period in {"today", "yesterday", "custom"} else "today",
+        }
+        session["modal_errors"] = errors
+        session["show_add_expense_modal"] = True
+        return redirect(return_to)
+
+    with database_connection() as connection:
+        save_expense(connection, user_id, values)
+
+    session["modal_expense"] = {
         "amount": "",
         "category_id": "",
-        "new_category": "",
         "expense_date": today.isoformat(),
         "description": "",
+        "date_period": "today",
     }
-    if request.method == "POST":
-        raw_period = request.form.get("date_period", "").strip()
-        raw_date_filter = request.form.get("date", "").strip()
-        intent = request.form.get("intent", "save")
-        if intent == "modal_save":
-            raw_period = "custom"
-            raw_date_filter = request.form.get("expense_date", "").strip()
-        elif not raw_period and request.form.get("expense_date", "").strip():
-            raw_period = "custom"
-            raw_date_filter = request.form.get("expense_date", "").strip()
-        values.update({
-            "amount": request.form.get("amount", "").strip(),
-            "category_id": request.form.get("category_id", "").strip(),
-            "new_category": request.form.get("new_category", "").strip(),
-            "description": request.form.get("description", "").strip(),
-        })
-    else:
-        raw_period = request.args.get("date_period", "").strip()
-        raw_date_filter = request.args.get("date", "").strip()
-        intent = "save"
-        category_query = request.args.get("category", "").strip()
-        if category_query and category_query not in valid_category_ids:
-            flash("Choose a valid category filter.", "error")
-        elif category_query:
-            values["category_id"] = category_query
-
-    date_period, date_start, date_end, date_filter, date_error = resolve_expense_date_filter(
-        raw_period,
-        raw_date_filter,
-        today,
-    )
-    transaction_date = {
-        "today": today,
-        "yesterday": date_start,
-        "last7": today,
-        "custom": date_start,
-    }[date_period]
-    values["expense_date"] = transaction_date.isoformat()
-
-    if date_error and intent != "modal_save":
-        flash(date_error, "error")
-
-    category_filter = values["category_id"]
-    if category_filter and category_filter not in valid_category_ids:
-        if category_filter != "__new__" and intent != "modal_save":
-            flash("Choose a valid category filter.", "error")
-        category_filter = ""
-
-    conditions = ["e.user_id = ?", "e.expense_date >= ?", "e.expense_date < ?"]
-    filter_values = [session["user_id"], date_start.isoformat(), date_end.isoformat()]
-    if category_filter:
-        conditions.append("e.category_id = ?")
-        filter_values.append(category_filter)
-    with database_connection() as connection:
-        expenses = connection.execute(
-            "SELECT e.id, e.amount, e.category, e.category_id, e.expense_date, e.description "
-            "FROM expenses e "
-            f"WHERE {' AND '.join(conditions)} "
-            "ORDER BY e.expense_date DESC, e.id DESC",
-            filter_values,
-        ).fetchall()
-
-    date_analytics = get_period_analytics(
-        session["user_id"],
-        date_start.year,
-        date_start.month,
-        category_id=int(category_filter) if category_filter else None,
-        start_date=date_start,
-        end_date=date_end,
-    )
-    total = date_analytics["total"]
-
-    def render_add_expense(status=200):
-        return render_template(
-            "add_expense.html",
-            expense=values,
-            categories=categories,
-            today=today.isoformat(),
-            expenses=expenses,
-            category_filter=category_filter,
-            date_period=date_period,
-            date_filter=date_filter,
-            date_label={
-                "today": "Today",
-                "yesterday": "Yesterday",
-                "last7": "Last 7 Days",
-                "custom": date_filter,
-            }[date_period],
-            date_analytics=date_analytics,
-            total=total,
-        ), status
-
-    if request.method == "POST":
-        if intent == "filter":
-            return render_add_expense()
-
-        if date_error:
-            if intent == "modal_save":
-                session["show_add_expense_modal"] = True
-                return _render_dashboard(values, [date_error], status=400)
-            return render_add_expense(400)
-
-        form_data = request.form.to_dict()
-        form_data["expense_date"] = transaction_date.isoformat()
-        values, errors = parse_expense_form(form_data, session["user_id"])
-        if errors:
-            if intent == "modal_save":
-                session["show_add_expense_modal"] = True
-                return _render_dashboard(values, errors, status=400)
-            for error in errors:
-                flash(error, "error")
-            return render_add_expense(400)
-
-        with database_connection() as connection:
-            save_expense(connection, session["user_id"], values)
-        if intent == "modal_save":
-            session["show_add_expense_modal"] = True
-            session["expense_save_success"] = True
-            return redirect(url_for("dashboard"))
-        flash("Expense saved.", "success")
-        return redirect(url_for(
-            "add_expense",
-            date_period=date_period,
-            date=date_filter if date_period == "custom" else None,
-            category=values["category_id"] if values["category_id"] != "__new__" else None,
-        ))
-
-    return render_add_expense()
+    session["modal_errors"] = []
+    session["modal_success"] = True
+    session["show_add_expense_modal"] = True
+    return redirect(return_to)
 
 
 @app.route("/expenses/<int:expense_id>/edit", methods=["GET", "POST"])

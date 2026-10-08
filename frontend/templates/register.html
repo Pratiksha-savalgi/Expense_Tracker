@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Create account{% endblock %}
-{% block body_class %}auth-page{% endblock %}
+{% block body_class %}auth-page register-page{% endblock %}
 {% block content %}
 <section class="auth-layout">
   <div class="auth-aside">
@@ -13,27 +13,39 @@
     <p class="eyebrow">Your account</p>
     <h2>Create an account</h2>
     <p class="form-intro">Your expenses stay private to your account.</p>
-    <form method="post" class="form-stack" data-password-confirm>
+    <form method="post" class="form-stack" data-registration-form novalidate>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label for="username">Username</label>
-      <input id="username" name="username" type="text" autocomplete="username" required value="{{ username }}" placeholder="Choose a username">
+      <input id="username" name="username" type="text" autocomplete="username" required minlength="3" maxlength="15" pattern="(?=.*[A-Za-z])(?=.*[0-9])(?=.*[_@])[A-Za-z0-9_@]{3,15}" title="Use 3–15 letters, numbers, underscores, or @, including at least one of each required kind." value="{{ username }}" placeholder="Choose a username" aria-describedby="username-error">
+      <p class="registration-field-error" id="username-error" data-registration-error="username" data-server-error="{{ registration_errors.get('username', '') }}" data-server-value="{{ username }}" {% if not registration_errors.get('username') %}hidden{% endif %}>{{ registration_errors.get('username', '') }}</p>
+      <label for="role">Role</label>
+      <select id="role" name="role" required aria-describedby="role-error">
+        <option value="" {% if not role %}selected{% endif %}>Select your role</option>
+        <option value="Student" {% if role == "Student" %}selected{% endif %}>Student</option>
+        <option value="Professional" {% if role == "Professional" %}selected{% endif %}>Professional</option>
+        <option value="Homemaker" {% if role == "Homemaker" %}selected{% endif %}>Homemaker</option>
+      </select>
+      <p class="registration-field-error" id="role-error" data-registration-error="role" data-server-error="{{ registration_errors.get('role', '') }}" data-server-value="{{ role }}" {% if not registration_errors.get('role') %}hidden{% endif %}>{{ registration_errors.get('role', '') }}</p>
       <label for="password">Password</label>
       <span class="password-field">
-        <input id="password" name="password" type="password" autocomplete="new-password" required>
+        <input id="password" name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="36" pattern="(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s])\S{8,36}" title="Use 8–36 characters with uppercase and lowercase letters, a number, and a symbol. Spaces are not allowed." aria-describedby="password-error">
         <button class="password-toggle" type="button" data-password-toggle="password" aria-label="Show password" aria-pressed="false" title="Show password">
           <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
           <svg class="eye-closed" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8"></path><path d="M9.9 5.2A11 11 0 0 1 12 5c5.2 0 9.3 4.5 10 7-.3 1.1-1.4 2.9-3.1 4.4M6.6 6.6C4.1 8 2.4 10.5 2 12c.7 2.5 4.8 7 10 7 1.1 0 2.1-.2 3.1-.6"></path></svg>
         </button>
       </span>
+      <p class="registration-field-error" id="password-error" data-registration-error="password" data-server-error="{{ registration_errors.get('password', '') }}" data-server-value="" {% if not registration_errors.get('password') %}hidden{% endif %}>{{ registration_errors.get('password', '') }}</p>
       <label for="confirm_password">Confirm password</label>
       <span class="password-field">
-        <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required>
+        <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required aria-describedby="confirm-password-error">
         <button class="password-toggle" type="button" data-password-toggle="confirm_password" aria-label="Show password" aria-pressed="false" title="Show password">
           <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
           <svg class="eye-closed" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8"></path><path d="M9.9 5.2A11 11 0 0 1 12 5c5.2 0 9.3 4.5 10 7-.3 1.1-1.4 2.9-3.1 4.4M6.6 6.6C4.1 8 2.4 10.5 2 12c.7 2.5 4.8 7 10 7 1.1 0 2.1-.2 3.1-.6"></path></svg>
         </button>
       </span>
-      <button class="button button-primary button-full" type="submit">Create account <span aria-hidden="true">→</span></button>
+      <p class="registration-field-error" id="confirm-password-error" data-registration-error="confirm_password" data-server-error="{{ registration_errors.get('confirm_password', '') }}" data-server-value="" {% if not registration_errors.get('confirm_password') %}hidden{% endif %}>{{ registration_errors.get('confirm_password', '') }}</p>
+      <p class="registration-feedback" data-registration-feedback role="status" aria-live="polite">Complete all fields to enable account creation.</p>
+      <button class="button button-primary button-full" type="submit" disabled>Create account <span aria-hidden="true">→</span></button>
     </form>
     <p class="auth-switch">Already registered? <a href="{{ url_for('login') }}">Sign in</a></p>
   </div>

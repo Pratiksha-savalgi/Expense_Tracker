@@ -16,8 +16,8 @@ The browser does not access SQLite directly.
 
 ## Data model
 
-- **User**: case-insensitively unique username and password hash and user type
-(Student, Homemaker, or Working Professional).
+- **User**: case-sensitive unique username, password hash, and role (Student,
+  Homemaker, or Professional).
 - **Category**: user-owned display name and normalized comparison name.
 - **Expense**: user, amount, category ID and display name, ISO date, optional
   description.
@@ -31,10 +31,10 @@ The browser does not access SQLite directly.
 - Dashboard displays current-month budget metrics, status, recent expenses, and
   budget controls.
 
-- Add Expense follows the AddExpense visual: Amount full width; Category and
-  single-choice Date controls side by side; Description; Save. The selected
-  date period sets the new expense date and filters the existing-record list,
-  summary, and category analytics.
+- Add Expense is a shared popup opened after login and from authenticated
+  Add Expense actions. It follows the AddExpense visual: Amount, role-specific
+  Category dropdown, Today/Yesterday/custom Date controls, optional
+  Description, and Save.
 - Expenses provides the complete unfiltered ledger, category filter, and
   expense list.
 
@@ -54,25 +54,18 @@ The browser does not access SQLite directly.
   distribution, and a selectable full-month comparison with the month before
   the chosen comparison month.
 
-### Add Expense date-filter hierarchy
+### Add Expense popup hierarchy
 
-1. Add Expense heading and link back to the unfiltered Expenses ledger.
-2. Expense-entry form with Amount, Category, Date controls, Description, and
-   Save.
-3. Date controls are Today, Yesterday and a custom picker. Today
-   is the default. Quick presets choose the saved expense date; custom date
-   chooses the exact saved date.
-4. Filtered summary cards and category analytics, with a link to open the same
-   date window on Analytics.
-5. Matching existing expense list.
+1. Popup heading and close action.
+2. Amount and the signed-in user's role-specific Category dropdown.
+3. Date controls with only Today, Yesterday, and a custom date picker; Today is
+   active by default.
+4. Optional Description and Save action.
+5. Validation feedback remains in the popup; a successful save displays a
+   confirmation and resets the form after acknowledgment.
 
-Today is active on initial load. Quick filter controls use a visually distinct
-active state. Selecting a custom date activates the date picker and clears
-quick-filter state. A selected date period and category drive both the new
-expense fields and the existing-record preview, so the page has one source of
-truth and no duplicate date/category filters. Changing a selection refreshes
-the list and all date-scoped summary/analytics values without saving a record.
-The controls wrap on tablets and use a compact grid on narrow mobile screens.
+No subcategory, category-creation, or Last 7 Days controls are shown. The popup
+uses the shared green theme and remains usable on desktop and mobile layouts.
 
 All authenticated pages share the same navigation and responsive styling.
 
@@ -126,11 +119,11 @@ responsiveness, navigation, spacing, and interactions.
 
 #### Web
 
-![Login/Login_web.png
+[visuals/Login_web.png](docs\design\visuals\Login_web.png)
 
 #### Mobile
 
-![Login/Login_mobile.png
+[visuals/Login_mobile.png](docs\design\visuals\Login_mobile.png)
 
 Sign-in uses username and password. Registration is available from the login
 flow. Users who are not authenticated are redirected to the login page when
@@ -140,29 +133,29 @@ attempting to access protected pages.
 
 #### Web
 
-visuals/Register_web.png
+[visuals/Register_web.png](docs\design\visuals\Register_web.png)
 
 #### Mobile
 
-![suals/Register_mobile1.png
+![visuals/Register_mobile1.png](docs\design\visuals\Register_mobile1.png)
 
-visuals/Register_mobile2.png
+![visuals/Register_mobile2.png](docs\design\visuals\Register_mobile2.png)
 
-Registration requires a username, password, password confirmation, and user
-type selection. Users must choose one of the following user types:
+Registration requires a username, role, password, and password confirmation.
+Users must choose one of the following roles:
 
 - Student
 - Homemaker
-- Working Professional
+- Professional
 
-The selected user type is stored with the user profile and determines the
-default category set assigned to the user.
+The selected role is stored with the user profile and determines the default
+category set assigned to the user.
 
 ### Dashboard
 
 #### Web
 
-visuals/Dashboard.png
+[visuals/Dashboard.png]
 
 Dashboard displays budget amount, expense total, remaining budget, utilization,
 budget status, recent expenses, and budget controls.
@@ -182,21 +175,21 @@ using the Edit Budget action.
 
 #### Web
 
-visuals/Add_expense1.jpg
+![visuals/Add_expense1.jpg](docs\design\visuals\Add_expense1.jpg)
 
-visuals/Add_expense2.jpg
+![visuals/Add_expense2.jpg](docs\design\visuals\Add_expense2.jpg)
 
 #### Mobile
 
-visuals/Add_expense_mobile1.png
+![visuals/Add_expense_mobile1.png](docs\design\visuals\Add_expense_mobile1.jpg)
 
-visuals/Add_expense_mobile2.png
+![visuals/Add_expense_mobile2.png](docs\design\visuals\Add_expense_mobile2.jpg)
 
 The Add Expense form places Amount across the full width of the form, Category
 beside the Date presets/custom picker, followed by Description and Save.
 
-The selected date determines the expense date and filters the existing-record
-preview, summary values, and category analytics.
+The selected date determines the date saved for the new expense. The category
+dropdown contains only the defaults assigned to the signed-in user's role.
 
 
 
