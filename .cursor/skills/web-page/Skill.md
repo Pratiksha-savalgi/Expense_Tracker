@@ -4,6 +4,7 @@
 
 Build the Expense Tracker interface using Flask templates, HTML, CSS, and
 lightweight JavaScript. Follow the current behavior in
+Use the screenshots in the /design/visuals folder as the source of truth for UI implementation and responsiveness.
 [docs/requirements.md](../../docs/requirements.md),
 [docs/spec.md](../../docs/spec.md), and [docs/design.md](../../docs/design.md).
 

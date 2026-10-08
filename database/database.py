@@ -69,6 +69,22 @@ def initialize_database():
                 password_hash TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                normalized_name TEXT NOT NULL,
+                UNIQUE(user_id, normalized_name)
+            );
+
+            CREATE TABLE IF NOT EXISTS subcategories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                normalized_name TEXT NOT NULL,
+                UNIQUE(category_id, normalized_name)
+            );
+
             CREATE TABLE IF NOT EXISTS expenses (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -76,15 +92,9 @@ def initialize_database():
                 category TEXT NOT NULL,
                 expense_date TEXT NOT NULL,
                 description TEXT NOT NULL DEFAULT '',
-                category_id INTEGER REFERENCES categories(id) ON DELETE RESTRICT
-            );
-
-            CREATE TABLE IF NOT EXISTS categories (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                name TEXT NOT NULL,
-                normalized_name TEXT NOT NULL,
-                UNIQUE(user_id, normalized_name)
+                category_id INTEGER REFERENCES categories(id) ON DELETE RESTRICT,
+                subcategory_id INTEGER REFERENCES subcategories(id) ON DELETE SET NULL,
+                expense_type TEXT NOT NULL DEFAULT 'Liability'
             );
 
             CREATE TABLE IF NOT EXISTS budgets (
@@ -114,32 +124,15 @@ def initialize_database():
                 "ALTER TABLE expenses ADD COLUMN category_id INTEGER "
                 "REFERENCES categories(id) ON DELETE RESTRICT"
             )
-        if "subcategory_id" in expense_columns or "expense_type" in expense_columns:
-            connection.execute("ALTER TABLE expenses RENAME TO expenses_old")
+        if "subcategory_id" not in expense_columns:
             connection.execute(
-                """
-                CREATE TABLE expenses (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    amount TEXT NOT NULL,
-                    category TEXT NOT NULL,
-                    expense_date TEXT NOT NULL,
-                    description TEXT NOT NULL DEFAULT '',
-                    category_id INTEGER REFERENCES categories(id) ON DELETE RESTRICT
-                )
-                """
+                "ALTER TABLE expenses ADD COLUMN subcategory_id INTEGER "
+                "REFERENCES subcategories(id) ON DELETE SET NULL"
             )
+        if "expense_type" not in expense_columns:
             connection.execute(
-                "INSERT INTO expenses (id, user_id, amount, category, expense_date, description, category_id) "
-                "SELECT id, user_id, amount, category, expense_date, description, category_id FROM expenses_old"
+                "ALTER TABLE expenses ADD COLUMN expense_type TEXT NOT NULL DEFAULT 'Liability'"
             )
-            connection.execute("DROP TABLE expenses_old")
-
-        table_names = {
-            row["name"] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
-        }
-        if "subcategories" in table_names:
-            connection.execute("DROP TABLE subcategories")
 
         legacy_expenses = connection.execute(
             "SELECT id, user_id, category FROM expenses "

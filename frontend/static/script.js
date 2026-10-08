@@ -207,8 +207,6 @@ if (expenseForm) {
       amountInput.setCustomValidity("");
     }
   });
-<<<<<<< HEAD
-
   expenseForm.addEventListener("submit", (event) => {
     if (intentInput.value === "filter") {
       expenseForm.noValidate = false;
@@ -284,97 +282,3 @@ if (analyticsFilters) {
   syncMonthOptions();
   updateDays(true);
 }
-=======
-}
-
-const subcategoryDialog = document.querySelector("#subcategory-dialog");
-const subcategoryChart = subcategoryDialog?.querySelector("[data-subcategory-chart]");
-
-const formatChartMoney = (value) => new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  minimumFractionDigits: 2,
-}).format(Number(value));
-
-const buildSubcategoryChart = (categoryName, items) => {
-  subcategoryChart.replaceChildren();
-  const title = subcategoryDialog.querySelector("#subcategory-dialog-title");
-  title.textContent = `${categoryName} subcategories`;
-
-  const total = items.reduce((sum, item) => sum + Number(item.total), 0);
-  const chart = document.createElement("div");
-  chart.className = "vertical-chart modal-vertical-chart";
-  chart.setAttribute("role", "img");
-  chart.setAttribute("aria-label", `${categoryName} subcategory spending`);
-
-  for (const item of items) {
-    const amount = Number(item.total);
-    const share = total > 0 ? amount / total * 100 : 0;
-    const column = document.createElement("div");
-    column.className = "vertical-chart-column modal-chart-column";
-
-    const value = document.createElement("span");
-    value.className = "vertical-chart-value";
-    value.textContent = formatChartMoney(amount);
-
-    const track = document.createElement("span");
-    track.className = "vertical-chart-track";
-    const bar = document.createElement("span");
-    bar.className = "vertical-chart-fill vertical-chart-fill-secondary";
-    bar.style.setProperty("--bar-height", `${share}%`);
-    track.append(bar);
-
-    const label = document.createElement("span");
-    label.className = "vertical-chart-label";
-    label.textContent = item.subcategory;
-
-    column.append(value, track, label);
-    chart.append(column);
-  }
-
-  const table = document.createElement("table");
-  table.className = "dialog-data-table";
-  const caption = document.createElement("caption");
-  caption.textContent = `${categoryName} subcategory totals`;
-  const head = document.createElement("thead");
-  head.innerHTML = "<tr><th scope=\"col\">Subcategory</th><th scope=\"col\">Total</th><th scope=\"col\">Share</th></tr>";
-  const body = document.createElement("tbody");
-  for (const item of items) {
-    const row = document.createElement("tr");
-    const name = document.createElement("th");
-    name.scope = "row";
-    name.textContent = item.subcategory;
-    const amount = document.createElement("td");
-    amount.textContent = formatChartMoney(item.total);
-    const share = document.createElement("td");
-    share.textContent = `${total > 0 ? (Number(item.total) / total * 100).toFixed(1) : "0.0"}%`;
-    row.append(name, amount, share);
-    body.append(row);
-  }
-  table.append(caption, head, body);
-  subcategoryChart.append(chart, table);
-};
-
-document.addEventListener("click", (event) => {
-  const categoryButton = event.target.closest("[data-subcategories]");
-  if (categoryButton && subcategoryDialog && subcategoryChart) {
-    let items = [];
-    try {
-      items = JSON.parse(categoryButton.dataset.subcategories);
-    } catch {
-      items = [];
-    }
-    buildSubcategoryChart(categoryButton.dataset.categoryName, items);
-    subcategoryDialog.showModal();
-    return;
-  }
-
-  if (event.target.closest("[data-close-dialog]") && subcategoryDialog?.open) {
-    subcategoryDialog.close();
-  }
-});
-
-subcategoryDialog?.addEventListener("click", (event) => {
-  if (event.target === subcategoryDialog) subcategoryDialog.close();
-});
->>>>>>> d6b40453c92a130e5b5b7944ca268733689bb73c

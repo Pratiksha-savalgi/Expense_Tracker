@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-<<<<<<< HEAD
 {% block title %}Analytics{% endblock %}
 {% block content %}
 {% set month_names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] %}
@@ -65,78 +64,16 @@
       </div>
       {% endfor %}
     </div>
-=======
-{% block title %}Category analytics{% endblock %}
-{% block content %}
-<section class="dashboard-heading">
-  <div>
-    <p class="eyebrow">Where your money goes</p>
-    <h1>Analytics<span class="heading-period">.</span></h1>
-    <p class="page-lede">Category and subcategory totals for {{ period_label }}.</p>
-  </div>
-  <a class="button button-outline" href="{{ url_for('dashboard', period=period) }}">Back to dashboard</a>
-</section>
-
-<form class="period-switcher" method="get" action="{{ url_for('analytics_page') }}">
-  <label for="analytics-period">Analysis month</label>
-  <input id="analytics-period" name="period" type="month" value="{{ period }}">
-  {% if selected_category %}<input type="hidden" name="category_id" value="{{ selected_category.id }}">{% endif %}
-  <button class="button button-outline" type="submit">Show month</button>
-  {% if selected_category %}<a class="clear-filter" href="{{ url_for('analytics_page', period=period) }}">All categories</a>{% endif %}
-</form>
-
-<section class="records-section analytics-section" aria-labelledby="category-chart-title">
-  <div class="records-heading">
-    <div><p class="eyebrow">{{ period_label }}</p><h2 id="category-chart-title">Main category totals</h2></div>
-    <span class="records-date">Month total {{ format_money(analytics_total) }}</span>
-  </div>
-  {% if analytics_items %}
-  <div class="analytics-content">
-    <div class="vertical-chart" role="group" aria-label="Main category totals. Select a category to compare its subcategories.">
-      {% for item in analytics_items %}
-      <button class="vertical-chart-column" type="button" aria-haspopup="dialog" aria-controls="subcategory-dialog"
-        aria-label="{{ item.category }}, {{ format_money(item.total) }}. Show subcategory chart."
-        data-category-name="{{ item.category }}" data-subcategories="{{ item.subcategories|tojson|forceescape }}">
-        <span class="vertical-chart-value">{{ format_money(item.total) }}</span>
-        <span class="vertical-chart-track"><span class="vertical-chart-fill" style="--bar-height: {{ '%.2f'|format(item.percentage) }}%"></span></span>
-        <span class="vertical-chart-label">{{ item.category }}</span>
-      </button>
-      {% endfor %}
-    </div>
-    <div class="table-scroll">
-      <table>
-        <caption class="visually-hidden">Accessible main category totals for {{ period_label }}</caption>
-        <thead><tr><th scope="col">Main category</th><th scope="col">Total</th><th scope="col">Share</th><th scope="col">Details</th></tr></thead>
-        <tbody>
-          {% for item in analytics_items %}
-          <tr>
-            <th scope="row">{{ item.category }}</th>
-            <td>{{ format_money(item.total) }}</td>
-            <td>{{ '%.1f'|format(item.percentage) }}%</td>
-            <td><a class="text-action" href="{{ url_for('analytics_page', period=period, category_id=item.id) }}">View subcategories</a></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <p class="summary-note">Highest: {{ highest_category.category }} · Lowest: {{ lowest_category.category }}</p>
->>>>>>> d6b40453c92a130e5b5b7944ca268733689bb73c
   </div>
   {% else %}
   <div class="empty-state">
     <span class="empty-mark" aria-hidden="true">%</span>
-<<<<<<< HEAD
     <h3>No category data for this period</h3>
     <p>Add expenses for {{ month_names[selected_month - 1] }} {{ selected_year }} to see the spending distribution.</p>
-=======
-    <h3>No category data for {{ period_label }}</h3>
-    <p>Add expenses for this month to see your category breakdown.</p>
->>>>>>> d6b40453c92a130e5b5b7944ca268733689bb73c
   </div>
   {% endif %}
 </section>
 
-<<<<<<< HEAD
 <section class="analytics-panel comparison-panel" aria-labelledby="comparison-title">
   <div class="records-heading">
     <div>
@@ -179,13 +116,4 @@
     </article>
   </div>
 </section>
-=======
-<dialog class="chart-dialog" id="subcategory-dialog" aria-labelledby="subcategory-dialog-title">
-  <div class="chart-dialog-header">
-    <div><p class="eyebrow">{{ period_label }}</p><h2 id="subcategory-dialog-title">Subcategory totals</h2></div>
-    <button class="dialog-close" type="button" data-close-dialog aria-label="Close subcategory chart">&times;</button>
-  </div>
-  <div class="chart-dialog-content" data-subcategory-chart></div>
-</dialog>
->>>>>>> d6b40453c92a130e5b5b7944ca268733689bb73c
 {% endblock %}

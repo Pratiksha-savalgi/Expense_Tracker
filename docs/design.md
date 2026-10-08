@@ -16,28 +16,40 @@ The browser does not access SQLite directly.
 
 ## Data model
 
-- **User**: case-insensitively unique username and password hash.
+- **User**: case-insensitively unique username and password hash and user type
+(Student, Homemaker, or Working Professional).
 - **Category**: user-owned display name and normalized comparison name.
 - **Expense**: user, amount, category ID and display name, ISO date, optional
   description.
 - **Budget**: user, month, year, amount, creation and update timestamps.
 
-No subcategory or expense-type attribute is part of the current data model.
-Legacy databases are migrated to the current expense columns while retaining
-expense records and normalizing their categories.
+
 
 ## Presentation
 
 - Login and Register provide account access.
 - Dashboard displays current-month budget metrics, status, recent expenses, and
   budget controls.
-- Expenses provides the complete unfiltered ledger, category filter, and
-  expense actions.
+
 - Add Expense follows the AddExpense visual: Amount full width; Category and
   single-choice Date controls side by side; Description; Save. The selected
   date period sets the new expense date and filters the existing-record list,
   summary, and category analytics.
-- Edit Expense uses the same amount/category/date/description model.
+- Expenses provides the complete unfiltered ledger, category filter, and
+  expense list.
+
+- Selecting an expense displays the available expense actions:
+  - Edit
+  - Delete
+
+- Edit opens the Add Expense page with the selected expense's existing
+  amount, category, date, and description pre-populated for modification.
+
+- Delete displays a confirmation dialog before the expense is permanently
+  removed.
+
+- After a successful edit or delete operation, the expense list refreshes
+  automatically while preserving active filters.
 - Analytics provides year/month/day/category selection, a category
   distribution, and a selectable full-month comparison with the month before
   the chosen comparison month.
@@ -47,7 +59,7 @@ expense records and normalizing their categories.
 1. Add Expense heading and link back to the unfiltered Expenses ledger.
 2. Expense-entry form with Amount, Category, Date controls, Description, and
    Save.
-3. Date controls are Today, Yesterday, Last 7 Days, and a custom picker. Today
+3. Date controls are Today, Yesterday and a custom picker. Today
    is the default. Quick presets choose the saved expense date; custom date
    chooses the exact saved date.
 4. Filtered summary cards and category analytics, with a link to open the same
@@ -88,3 +100,135 @@ on track. A missing budget has a not-set state.
 Install dependencies with `python -m pip install -r requirements.txt` and start
 the app from the repository root with `python -m backend.app`. The development
 server listens on port 5000.
+
+
+
+# Visual Design Reference
+
+The current application uses the reference assets in this folder's `visuals`
+directory. Both web and mobile mockups are provided and should be treated as
+the primary visual references for implementation. The running templates and CSS
+are authoritative if a reference image does not exactly match current behavior.
+
+## Design Assets
+
+The `visuals` directory contains:
+
+- Web mockups
+- Mobile mockups
+- Application flow diagrams
+- Data flow diagrams
+
+All pages must follow the provided web and mobile designs for layout,
+responsiveness, navigation, spacing, and interactions.
+
+### Login
+
+#### Web
+
+![Login/Login_web.png
+
+#### Mobile
+
+![Login/Login_mobile.png
+
+Sign-in uses username and password. Registration is available from the login
+flow. Users who are not authenticated are redirected to the login page when
+attempting to access protected pages.
+
+### Register
+
+#### Web
+
+visuals/Register_web.png
+
+#### Mobile
+
+![suals/Register_mobile1.png
+
+visuals/Register_mobile2.png
+
+Registration requires a username, password, password confirmation, and user
+type selection. Users must choose one of the following user types:
+
+- Student
+- Homemaker
+- Working Professional
+
+The selected user type is stored with the user profile and determines the
+default category set assigned to the user.
+
+### Dashboard
+
+#### Web
+
+visuals/Dashboard.png
+
+Dashboard displays budget amount, expense total, remaining budget, utilization,
+budget status, recent expenses, and budget controls.
+
+The Recent Expenses section provides:
+
+- Month filter
+- Year filter
+- Day filter
+
+Changing a filter refreshes only the displayed expense list for the selected period.
+
+New users have a default budget value of 0 until a budget is created or updated
+using the Edit Budget action.
+
+### Expense Entry
+
+#### Web
+
+visuals/Add_expense1.jpg
+
+visuals/Add_expense2.jpg
+
+#### Mobile
+
+visuals/Add_expense_mobile1.png
+
+visuals/Add_expense_mobile2.png
+
+The Add Expense form places Amount across the full width of the form, Category
+beside the Date presets/custom picker, followed by Description and Save.
+
+The selected date determines the expense date and filters the existing-record
+preview, summary values, and category analytics.
+
+
+
+### Expenses
+
+#### Web
+
+visuals/Expenses.png
+
+The Expenses page lists amount, category, date, and description with category
+filtering.
+
+Selecting an expense displays the available actions:
+
+- Edit
+- Delete
+
+Edit opens the Add Expense page with the selected expense's existing amount,
+category, date, and description pre-populated.
+
+Delete displays a confirmation dialog before the expense is permanently
+removed.
+
+After a successful edit or delete operation, the expense list refreshes while
+preserving active filters.
+
+### Analytics
+
+Reference screenshots are available in the `visuals/Analytics/` folder.
+
+Analytics provides Year, Month, Day, and Category filters; a category
+distribution and spending summary; and comparison with the previous full month.
+
+Future months and years are unavailable. Invalid period selections are rejected
+and reset to a valid period with user feedback.

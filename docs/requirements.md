@@ -15,6 +15,56 @@ category-based spending analytics.
   expense or budget actions.
 - Each user can access only their own expenses, categories, and budgets.
 
+### User Types
+
+- Student
+- Homemaker
+- Working Professional
+
+- A user must select a user type during registration.
+- The selected user type is stored in the user's profile.
+
+## Categories
+
+### Default Categories by User Type
+
+#### Student
+
+- Education
+- Books
+- Transport
+- Food
+- Entertainment
+- Mobile Recharge
+- Other
+
+#### Homemaker
+
+- Groceries
+- Utilities
+- Household
+- Health
+- Education
+- Bills
+- Other
+
+#### Working Professional
+
+- Food
+- Transport
+- Bills
+- Shopping
+- Health
+- Investments
+- Entertainment
+- Other
+
+### Constraints
+
+- Users can select only from categories available to their user type.
+- Categories are automatically assigned when a user registers.
+- A user's categories remain private and visible only to that user.
+
 ## Expense management
 
 An expense consists of:
@@ -31,16 +81,7 @@ The application does not have subcategories or an expense-type classification.
 Neither is collected, displayed, filtered, validated, or stored as part of the
 current expense workflow.
 
-### Categories
 
-- Each user has their own category list.
-- The application seeds these categories for each user: Food, Utilities,
-  Transport, Household, Health, Shopping, Education, Entertainment, Bills, and
-  Other.
-- Users can add custom categories while entering or editing an expense.
-- Category names are normalized for capitalization and whitespace so equivalent
-  names do not create duplicate categories.
-- An expense must reference a category owned by its user.
 
 ### Expenses and Add Expense filters
 
@@ -49,12 +90,9 @@ current expense workflow.
 - The Expenses page provides the unfiltered expense ledger and category filter.
 - The Add Expense page uses the AddExpense visual hierarchy: Amount spans the
   form; Category and Date controls share a row; Description and Save follow.
-- The Date controls provide Today, Yesterday, Last 7 Days (including today),
-  and a custom date picker. Today is selected by default. This single selected
-  period controls the existing-record preview and the date saved for the new
+- The Date controls provide Today, Yesterday and a custom date picker. Today is selected by default.  - This single selected period controls the existing-record preview and the date saved for the new
   expense.
-- Today saves today's date; Yesterday saves yesterday's date; Last 7 Days saves
-  today's date; Custom saves the selected calendar date.
+- Today saves today's date; Yesterday saves yesterday's date Custom saves the selected calendar date.
 - Exactly one date option is active. Selecting a custom date clears the active
   quick-filter state, and selecting a quick filter clears the custom-date state.
 - The Category choice is the category for the new expense and filters the
@@ -72,10 +110,14 @@ current expense workflow.
 - The integrated form remains usable on the Add Expense page on mobile, tablet,
   and desktop layouts.
 
+
+
 ## Dashboard and monthly budgets
 
 - The Dashboard shows the signed-in user's current-month budget, expenses,
   remaining budget, utilization, status, and recent expenses.
+-- A newly registered user has a default budget of 0 for the current month.
+- Users can create or update the budget using the Edit Budget action. 
 - A user can create or update a budget for a selected month and year.
 - A budget amount must be positive and use no more than two decimal places.
 - There is one budget per user, month, and year; saving the same period updates
@@ -84,6 +126,20 @@ current expense workflow.
   is at least 80% and spending does not exceed the budget, “exceeded” when
   spending is greater than the budget, and “on track” otherwise.
 - Budgets are stored separately from expenses.
+
+### Recent Expenses
+
+- The Dashboard displays a Recent Expenses section.
+- The Recent Expenses section provides Year, Month, and Day filters.
+- The expense list refreshes automatically when a filter changes.
+- Only expenses belonging to the signed-in user are displayed.
+- Records are displayed newest first.
+- Future years and future months are not allowed.
+- A selected day must be valid and cannot be later than today.
+- Empty periods display a useful empty state.
+
+
+
 
 ## Analytics
 
@@ -101,6 +157,9 @@ current expense workflow.
   safe period with user feedback.
 - Empty periods show a useful empty state.
 
+
+
+
 ## Security and reliability
 
 - Passwords are stored as hashes, never plain text.
@@ -109,6 +168,9 @@ current expense workflow.
   the authenticated user.
 - Saved data is persisted in SQLite.
 - Monetary calculations use decimal arithmetic.
+
+
+
 
 ## Technology and operation
 
@@ -119,17 +181,108 @@ current expense workflow.
   development server listens at `http://127.0.0.1:5000`.
 - Install declared dependencies with `python -m pip install -r requirements.txt`.
 
+
+
+
+
 ## Acceptance criteria
 
-- A user can register, sign in, and sign out; unauthenticated protected-page
-  requests redirect to sign-in.
-- Expense CRUD works for the signed-in user's category-only records.
-- Invalid amounts, categories, dates, and future expense dates are rejected
-  without saving an expense.
-- Date quick filters and custom date, alone or combined with category, produce
-  the correct user-scoped list, summary values, and category analytics.
-- Dashboard budget values and status match the selected current-month data.
-- Analytics filters, category distribution, empty state, and previous-month
-  comparison use the signed-in user's data and enforce the current-period limit.
-- No application surface or persisted expense field represents subcategory or
-  expense type.
+### Registration
+
+- A new user can register with a unique username.
+- Duplicate usernames are rejected.
+- Password and password confirmation must match.
+- A user type (Student, Homemaker, or Working Professional) must be selected during registration.
+- The selected user type is stored successfully.
+- The user receives the correct default categories based on the selected user type.
+
+### Login and Logout
+
+- A registered user can sign in using valid credentials.
+- Invalid credentials are rejected with an appropriate error message.
+- Protected pages redirect unauthenticated users to the sign-in page.
+- A signed-in user can sign out successfully.
+- Signed-out users cannot access protected pages without signing in again.
+
+### Add Expense
+
+- A valid expense can be created successfully.
+- Amounts must be positive and contain no more than two decimal places.
+- Future dates are rejected.
+- Only categories belonging to the signed-in user can be selected.
+- A success message is displayed after saving an expense.
+- After successful save and acknowledgment, the expense form resets for a new entry.
+- Active filters remain unchanged after saving.
+
+### Expense Management
+
+- Users can view their own expenses.
+- Users can edit their own expenses successfully.
+- Users can delete their own expenses after confirmation.
+- Changes are reflected immediately in the expense list.
+- Users cannot access, edit, or delete expenses belonging to other users.
+
+### Expense Filters
+
+- Category filtering returns only matching user-owned expenses.
+- Date quick filters (Today, Yesterday, Last 7 Days) return correct results.
+- Custom date filtering returns correct results.
+- Summary values and expense previews update automatically when filters change.
+- Invalid dates and future dates are rejected.
+
+### Dashboard
+
+- The dashboard displays budget, expenses, remaining budget, utilization, and status correctly.
+- New users see a default budget value of 0 when no budget has been set.
+- Users can create or update a budget using the Edit Budget action.
+- Dashboard values reflect the signed-in user's data only.
+- Budget status is calculated according to the defined rules.
+
+### Dashboard Recent Expenses Filters
+
+- The Recent Expenses section displays only the signed-in user's expenses.
+- Year, Month, and Day filters return the correct expense records.
+- Changing a filter refreshes the expense list automatically.
+- Future years, future months, and invalid dates are rejected.
+- Empty filter results display a useful empty state.
+
+## Budget Management
+ 
+- Users can create a budget for a selected month and year.
+- Budget amounts must be positive and contain no more than two decimal places.
+- Saving a budget for an existing month and year updates the existing budget.
+- Budget calculations correctly reflect expenses for the selected period.
+- Budget utilization and status are calculated accurately.
+ 
+## Analytics
+ 
+- Analytics display spending, expense count, average expense, category totals, and category percentages correctly.
+- Analytics display the highest-spending category for the selected period.
+- Year, Month, Day, and Category filters return accurate results.
+- Previous-month comparisons use the correct user-scoped data.
+- Future years, future months, and invalid dates are rejected.
+- Empty periods display a useful empty state.
+ 
+## User Types and Categories
+ 
+- Student users receive the Student default category set.
+- Homemaker users receive the Homemaker default category set.
+- Working Professional users receive the Working Professional default category set.
+- Users can add custom categories.
+- Category names are normalized to prevent duplicates.
+- Users can access only their own categories.
+ 
+## Security and Data Protection
+ 
+- Passwords are stored as hashes and never as plain text.
+- State-changing requests require valid CSRF protection.
+- All expenses, categories, budgets, and analytics are scoped to the authenticated user.
+- Users cannot access data belonging to other users.
+- Application data persists correctly in SQLite.
+ 
+## Responsive User Interface
+ 
+- Registration, Login, Dashboard, Expenses, Budget, and Analytics pages remain fully functional on desktop devices.
+- Registration, Login, Dashboard, Expenses, Budget, and Analytics pages remain fully functional on mobile devices.
+- Responsive layouts match the approved UI designs in the design folder.
+- Core functionality remains accessible across supported screen sizes.

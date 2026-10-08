@@ -16,11 +16,7 @@
     <strong>{{ format_money(total) }}</strong>
     <span class="summary-note">{{ expenses|length }} {% if expenses|length == 1 %}record{% else %}records{% endif %}{% if category_filter %} matching category{% endif %}</span>
   </div>
-<<<<<<< HEAD
-  <form class="filter-form" method="get" action="{{ url_for('expenses_page') }}">
-=======
   <form class="filter-form" method="get" action="{{ url_for('expenses') }}">
->>>>>>> d6b40453c92a130e5b5b7944ca268733689bb73c
     <div class="filter-field">
       <label for="category-filter">Category</label>
       <select id="category-filter" name="category">
@@ -30,16 +26,12 @@
         {% endfor %}
       </select>
     </div>
-<<<<<<< HEAD
-    {% if category_filter %}<a class="clear-filter" href="{{ url_for('expenses_page') }}">Clear category</a>{% endif %}
-=======
     <div class="filter-field">
       <label for="date-filter">Date</label>
       <input id="date-filter" name="date" type="date" value="{{ date_filter }}">
     </div>
     <button class="button button-outline" type="submit">Apply filters</button>
     {% if category_filter or date_filter %}<a class="clear-filter" href="{{ url_for('expenses') }}">Clear</a>{% endif %}
->>>>>>> d6b40453c92a130e5b5b7944ca268733689bb73c
   </form>
 </section>
 
@@ -74,7 +66,7 @@
   {% else %}
   <div class="empty-state">
     <span class="empty-mark" aria-hidden="true">+</span>
-    {% if category_filter %}<h3>No matching expenses</h3><p>Try another category or clear the filter.</p><a class="button button-outline" href="{{ url_for('expenses_page') }}">Clear category</a>
+    {% if category_filter or date_filter %}<h3>No matching expenses</h3><p>Try another filter or clear the filters.</p><a class="button button-outline" href="{{ url_for('expenses') }}">Clear filters</a>
     {% else %}<h3>Your ledger starts here</h3><p>Add an expense and it will appear here for you to review.</p><a class="button button-primary" href="{{ url_for('add_expense') }}">Add your first expense</a>{% endif %}
   </div>
   {% endif %}
