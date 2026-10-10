@@ -1,9 +1,6 @@
 <dialog class="expense-modal" data-expense-modal data-auto-open="{{ 'true' if show_expense_modal else 'false' }}" data-today="{{ today }}" data-yesterday="{{ yesterday }}" aria-labelledby="expense-modal-title">
   <div class="expense-modal-header">
-    <div>
-      <p class="eyebrow">Expense record</p>
-      <h2 id="expense-modal-title">Add an expense</h2>
-    </div>
+    <h2 id="expense-modal-title">Add expense</h2>
     <form method="post" action="{{ url_for('dismiss_expense_modal') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="return_to" value="{{ modal_return_to }}">

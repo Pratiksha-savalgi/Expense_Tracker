@@ -64,8 +64,7 @@ The browser does not access SQLite directly.
 5. Validation feedback remains in the popup; a successful save displays a
    confirmation and resets the form after acknowledgment.
 
-No subcategory, category-creation, or Last 7 Days controls are shown. The popup
-uses the shared green theme and remains usable on desktop and mobile layouts.
+
 
 All authenticated pages share the same navigation and responsive styling.
 
@@ -155,21 +154,117 @@ category set assigned to the user.
 
 #### Web
 
-[visuals/Dashboard.png]
+![Dashboard web reference 1](design/visuals/Dashboard/Dashboard_web1.png)
 
-Dashboard displays budget amount, expense total, remaining budget, utilization,
-budget status, recent expenses, and budget controls.
+![Dashboard web reference 2](design/visuals/Dashboard/Dashboard_web2.png)
 
-The Recent Expenses section provides:
+![Dashboard web reference 3](design/visuals/Dashboard/Dashboard_web3.png)
 
-- Month filter
-- Year filter
-- Day filter
+The overall look and feel of the Dashboard shall remain consistent with the approved mockup provided. The layout, component placement, color scheme, navigation structure, spacing, and visual styling shall closely follow the mockup design to ensure a consistent user experience across the application.
 
-Changing a filter refreshes only the displayed expense list for the selected period.
+#### Mobile
 
-New users have a default budget value of 0 until a budget is created or updated
-using the Edit Budget action.
+![Dashboard mobile reference](design/visuals/Dashboard/Dashboard_mobile.png)
+
+The mobile Dashboard matches this mockup: a top brand bar, the budget period on
+the right of the Budget Progress header, swipeable pages of five recent
+expenses, previous and next navigation, a floating Add Expense button, and bottom navigation
+for Dashboard, Analytics, and Profile. Edit budget is shown under the budget
+period and opens the same budget dialog used on the web layout.
+
+The Dashboard provides an overview of the user's spending and budget information. The page consists of a Budget Progress section, a Recent Expenses section, navigation controls, and expense management actions.
+
+#### Budget Progress Section
+
+The Budget Progress section displays:
+
+- Total Budget
+- Amount Spent
+- Remaining Budget
+- Utilization Percentage
+- Progress Bar
+- Edit Budget Action
+
+Selecting **Edit Budget** opens a modal dialog where the user can enter a budget amount and confirm the update.
+
+New users have a default budget value of **₹0** until a budget is created or updated.
+
+#### Recent Expenses Section
+
+The Recent Expenses section displays the latest recorded expenses.
+
+The section provides:
+
+- Calendar date filter. Any day up to today can be chosen. The calendar cannot select a future date. Leave it empty to show every day in the current month.
+- Reset action. Clears the calendar filter and shows the recent expenses for the current month.
+
+Changing the calendar or using Reset updates only the expense records in this section. The rest of the Dashboard stays as it is.
+
+Expense records are displayed in descending order by date (most recent first).
+
+Each expense record displays:
+
+- Expense Name
+- Category
+- Amount
+- Date
+
+The section initially displays the five most recent expenses and shows the total number of matching expense records.
+
+
+#### Expense Management
+
+Selecting an expense row displays actions for:
+
+- Edit Expense
+- Delete Expense
+
+#### Expense History Pagination
+
+The full Expense History view supports pagination.
+
+Pagination behavior:
+
+- Default page size: 5 expense records per page
+- Records are sorted by date in descending order
+- Previous and Next navigation controls are provided
+- Active filters remain applied when navigating pages
+- Previous is disabled on the first page
+- Next is disabled on the last page
+- Current page number is displayed
+- A summary indicating the displayed range and total record count is shown
+
+Example:
+
+```
+Showing 1–5 of 20 expenses
+```
+
+#### Navigation
+
+The left navigation panel provides access to:
+
+- Dashboard
+- Analytics
+- Profile
+- Sign Out
+
+#### Add Expense
+
+Selecting **Add Expense** opens the expense creation form, allowing the user to add a new expense record.
+
+#### User Interface
+
+The overall layout, component placement, navigation structure, spacing, and visual styling shall remain consistent with the approved dashboard mockup.
+
+
+
+
+### Budget Management
+
+New users have a default budget value of **₹0** until a budget is created or updated using the **Edit Budget** action.
+
+Selecting **Edit Budget** opens the budget management form, where users can create, update, or replace their current budget amount.
 
 ### Expense Entry
 

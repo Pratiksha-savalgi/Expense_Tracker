@@ -133,7 +133,7 @@ today when creating an expense. Deletion requires browser confirmation.
 
 - The Dashboard shows the signed-in user's current-month budget, expenses,
   remaining budget, utilization, status, and recent expenses.
--- A newly registered user has a default budget of 0 for the current month.
+- A newly registered user has a default budget of 0 for the current month.
 - Users can create or update the budget using the Edit Budget action. 
 - A user can create or update a budget for a selected month and year.
 - A budget amount must be positive and use no more than two decimal places.
@@ -147,8 +147,11 @@ today when creating an expense. Deletion requires browser confirmation.
 ### Recent Expenses
 
 - The Dashboard displays a Recent Expenses section.
-- The Recent Expenses section provides Year, Month, and Day filters.
+- The Recent Expenses section provides a calendar date filter. An empty calendar shows every day in the current month.
 - The expense list refreshes automatically when a filter changes.
+- The reset control clears the calendar filter and shows the recent expenses for the current month.
+- Reset and filter changes update only the Recent Expenses records, not the rest of the Dashboard.
+- Five expenses are shown per page, newest first, with previous and next navigation.
 - Only expenses belonging to the signed-in user are displayed.
 - Records are displayed newest first.
 - Future years and future months are not allowed.
@@ -260,7 +263,7 @@ today when creating an expense. Deletion requires browser confirmation.
 ### Dashboard Recent Expenses Filters
 
 - The Recent Expenses section displays only the signed-in user's expenses.
-- Year, Month, and Day filters return the correct expense records.
+- The calendar date filter returns the correct expense records.
 - Changing a filter refreshes the expense list automatically.
 - Future years, future months, and invalid dates are rejected.
 - Empty filter results display a useful empty state.

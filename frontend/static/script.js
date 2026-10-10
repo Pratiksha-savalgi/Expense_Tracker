@@ -241,7 +241,10 @@ if (expenseModal) {
       amountInput.setCustomValidity("Enter an amount.");
     } else if (Number(amountInput.value) <= 0) {
       amountInput.setCustomValidity("Amount must be greater than zero.");
-    } else if (amountInput.validity.stepMismatch) {
+    } else if (
+      !/^(?:\d+(?:\.\d{1,2})?|\.\d{1,2})$/.test(amountInput.value) ||
+      amountInput.validity.stepMismatch
+    ) {
       amountInput.setCustomValidity("Amount must use no more than two decimal places.");
     } else {
       amountInput.setCustomValidity("");
@@ -257,10 +260,29 @@ if (expenseModal) {
   });
 
   expenseModal.addEventListener("cancel", (event) => event.preventDefault());
-  if (expenseModal.dataset.autoOpen === "true" && !expenseModal.open) expenseModal.showModal();
+  if (expenseModal.dataset.autoOpen === "true" && !expenseModal.open) {
+    const openExpenseModal = () => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (!expenseModal.isConnected || expenseModal.open) return;
+          expenseModal.showModal();
+          if (successMessage) {
+            saveConfirmation.focus();
+          } else if (modalForm.querySelector("#modal-amount").value) {
+            modalForm.querySelector("#modal-amount").focus();
+          }
+        });
+      });
+    };
+
+    if (document.readyState === "complete") {
+      openExpenseModal();
+    } else {
+      window.addEventListener("load", openExpenseModal, { once: true });
+    }
+  }
 
   if (successMessage) {
-    saveConfirmation.focus();
     saveConfirmation.addEventListener("click", () => {
       successMessage.hidden = true;
       modalForm.reset();
@@ -271,15 +293,12 @@ if (expenseModal) {
       setActiveDatePeriod("today");
       modalForm.querySelector("#modal-amount").focus();
     });
-  } else if (modalForm.querySelector("#modal-amount").value) {
-    modalForm.querySelector("#modal-amount").focus();
   }
 }
 
-document.querySelectorAll("[data-open-expense-modal]").forEach((button) => {
-  button.addEventListener("click", () => {
-    if (expenseModal && !expenseModal.open) expenseModal.showModal();
-  });
+document.addEventListener("click", (event) => {
+  if (!event.target.closest("[data-open-expense-modal]")) return;
+  if (expenseModal && !expenseModal.open) expenseModal.showModal();
 });
 
 const expenseForm = document.querySelector("[data-expense-form]");
@@ -349,7 +368,10 @@ if (expenseForm) {
       amountInput.setCustomValidity("Enter an amount.");
     } else if (Number(amountInput.value) <= 0) {
       amountInput.setCustomValidity("Amount must be greater than zero.");
-    } else if (amountInput.validity.stepMismatch) {
+    } else if (
+      !/^(?:\d+(?:\.\d{1,2})?|\.\d{1,2})$/.test(amountInput.value) ||
+      amountInput.validity.stepMismatch
+    ) {
       amountInput.setCustomValidity("Amount must use no more than two decimal places.");
     } else {
       amountInput.setCustomValidity("");
@@ -369,6 +391,117 @@ if (expenseForm) {
 const expenseCategoryFilter = document.querySelector("#category-filter");
 if (expenseCategoryFilter) {
   expenseCategoryFilter.addEventListener("change", () => expenseCategoryFilter.form.requestSubmit());
+}
+
+const dashboardFilters = document.querySelector("[data-dashboard-filters]");
+if (dashboardFilters) {
+  const monthInput = dashboardFilters.querySelector('[name="month"]');
+  const yearInput = dashboardFilters.querySelector('[name="year"]');
+  const dayInput = dashboardFilters.querySelector('[name="day"]');
+  const calendar = dashboardFilters.querySelector("[data-dashboard-calendar]");
+  const todayIso = dashboardFilters.dataset.today;
+  const [todayYear, todayMonth] = todayIso.split("-").map(Number);
+  const allowedYears = new Set(dashboardFilters.dataset.years.split(",").map(Number));
+  const toIso = (year, month, day) => (
+    `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+  );
+
+  const syncDashboardOptions = () => {
+    calendar.max = todayIso;
+    calendar.min = `${Math.min(...allowedYears)}-01-01`;
+    if (!dayInput.value) {
+      calendar.value = "";
+      return;
+    }
+    const iso = toIso(yearInput.value, monthInput.value, dayInput.value);
+    if (iso > todayIso || !allowedYears.has(Number(yearInput.value))) {
+      dayInput.value = "";
+      yearInput.value = String(todayYear);
+      monthInput.value = String(todayMonth);
+      calendar.value = "";
+      return;
+    }
+    calendar.value = iso;
+  };
+
+  const pageInput = dashboardFilters.querySelector('[name="page"]');
+  const resetPage = () => {
+    if (pageInput) pageInput.value = "1";
+  };
+  const results = document.querySelector("[data-expense-results]");
+  const expenseSection = results.closest(".dashboard-recent-card");
+  let expenseRequest = 0;
+
+  const refreshExpenseList = async () => {
+    const requestId = expenseRequest + 1;
+    expenseRequest = requestId;
+    const params = new URLSearchParams(new FormData(dashboardFilters));
+    const url = `${dashboardFilters.action}?${params.toString()}`;
+    expenseSection.setAttribute("aria-busy", "true");
+    try {
+      const response = await fetch(url, {
+        headers: { "X-Dashboard-Fragment": "expenses" },
+        credentials: "same-origin",
+      });
+      if (!response.ok || requestId !== expenseRequest) return;
+      results.innerHTML = await response.text();
+      const fragment = results.querySelector("[data-expense-fragment]");
+      if (fragment) {
+        if (fragment.dataset.year) yearInput.value = fragment.dataset.year;
+        if (fragment.dataset.month) monthInput.value = fragment.dataset.month;
+        dayInput.value = fragment.dataset.day || "";
+        syncDashboardOptions();
+        if (pageInput) pageInput.value = fragment.dataset.page || "1";
+      }
+      if (requestId === expenseRequest) window.history.replaceState(null, "", url);
+    } catch (error) {
+      dashboardFilters.submit();
+    } finally {
+      if (requestId === expenseRequest) expenseSection.removeAttribute("aria-busy");
+    }
+  };
+
+  calendar.addEventListener("change", () => {
+    if (!calendar.value || calendar.value > todayIso) {
+      dayInput.value = "";
+      yearInput.value = String(todayYear);
+      monthInput.value = String(todayMonth);
+      calendar.value = "";
+    } else {
+      const [year, month, day] = calendar.value.split("-").map(Number);
+      if (!allowedYears.has(year)) {
+        dayInput.value = "";
+        yearInput.value = String(todayYear);
+        monthInput.value = String(todayMonth);
+        calendar.value = "";
+      } else {
+        yearInput.value = String(year);
+        monthInput.value = String(month);
+        dayInput.value = String(day);
+      }
+    }
+    syncDashboardOptions();
+    resetPage();
+    refreshExpenseList();
+  });
+  dashboardFilters.addEventListener("submit", (event) => {
+    event.preventDefault();
+    yearInput.value = String(todayYear);
+    monthInput.value = String(todayMonth);
+    dayInput.value = "";
+    calendar.value = "";
+    syncDashboardOptions();
+    resetPage();
+    refreshExpenseList();
+  });
+  document.addEventListener("click", (event) => {
+    const pageLink = event.target.closest("[data-expense-page]");
+    if (!pageLink || !results.contains(pageLink)) return;
+    event.preventDefault();
+    if (pageInput) pageInput.value = pageLink.dataset.expensePage;
+    refreshExpenseList();
+  });
+  syncDashboardOptions();
 }
 
 const analyticsFilters = document.querySelector(".analytics-filters");
@@ -429,4 +562,106 @@ if (analyticsFilters) {
   monthSelect.addEventListener("change", () => updateDays(true));
   syncMonthOptions();
   updateDays(true);
+}
+
+const closeExpenseMenus = () => {
+  document.querySelectorAll("[data-expense-row].is-selected").forEach((row) => {
+    row.classList.remove("is-selected");
+    row.setAttribute("aria-expanded", "false");
+    const popover = row.querySelector(".expense-action-popover");
+    if (popover) popover.hidden = true;
+  });
+};
+
+const openExpenseMenu = (row) => {
+  closeExpenseMenus();
+  const popover = row.querySelector(".expense-action-popover");
+  if (!popover) return;
+  popover.hidden = false;
+  row.classList.add("is-selected");
+  row.setAttribute("aria-expanded", "true");
+  const rect = row.getBoundingClientRect();
+  const anchor = (row.querySelector(".dashboard-expense-amount") || row).getBoundingClientRect();
+  const width = popover.offsetWidth;
+  const top = Math.min(rect.top + rect.height / 2, window.innerHeight - popover.offsetHeight - 12);
+  const left = Math.max(12, Math.min(anchor.right - width + 8, window.innerWidth - width - 12));
+  popover.style.position = "fixed";
+  popover.style.top = `${Math.max(12, top)}px`;
+  popover.style.left = `${left}px`;
+};
+
+document.addEventListener("click", (event) => {
+  if (event.target.closest(".expense-action-popover")) return;
+  const row = event.target.closest("[data-expense-row]");
+  if (!row) {
+    closeExpenseMenus();
+    return;
+  }
+  if (row.classList.contains("is-selected")) closeExpenseMenus();
+  else openExpenseMenu(row);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeExpenseMenus();
+    return;
+  }
+  if (event.target.closest(".expense-action-popover")) return;
+  const row = event.target.closest("[data-expense-row]");
+  if (!row || (event.key !== "Enter" && event.key !== " ")) return;
+  event.preventDefault();
+  if (row.classList.contains("is-selected")) closeExpenseMenus();
+  else openExpenseMenu(row);
+});
+
+window.addEventListener("resize", closeExpenseMenus);
+window.addEventListener("scroll", closeExpenseMenus, true);
+
+const budgetModal = document.querySelector("[data-budget-modal]");
+if (budgetModal) {
+  const amountInput = budgetModal.querySelector("#dashboard-budget-amount");
+  const openBudgetModal = () => {
+    if (!budgetModal.open) budgetModal.showModal();
+    amountInput.focus();
+  };
+  document.querySelectorAll("[data-open-budget-modal]").forEach((button) => {
+    button.addEventListener("click", openBudgetModal);
+  });
+  budgetModal.querySelector("[data-close-budget-modal]").addEventListener("click", () => budgetModal.close());
+  budgetModal.querySelector("[data-budget-form]").addEventListener("submit", (event) => {
+    if (!amountInput.value) {
+      amountInput.setCustomValidity("Enter a budget amount.");
+    } else if (Number(amountInput.value) <= 0) {
+      amountInput.setCustomValidity("Budget amount must be greater than zero.");
+    } else if (!/^(?:\d+(?:\.\d{1,2})?|\.\d{1,2})$/.test(amountInput.value)) {
+      amountInput.setCustomValidity("Use no more than two decimal places.");
+    } else {
+      amountInput.setCustomValidity("");
+    }
+    if (!budgetModal.querySelector("[data-budget-form]").reportValidity()) event.preventDefault();
+  });
+  amountInput.addEventListener("input", () => amountInput.setCustomValidity(""));
+  if (budgetModal.dataset.autoOpen === "true") openBudgetModal();
+}
+
+const swipeTrack = document.querySelector("[data-expense-swipe]");
+if (swipeTrack) {
+  const dots = [...swipeTrack.parentElement.querySelectorAll("[data-swipe-dot]")];
+  const pages = [...swipeTrack.children];
+  const markActiveDot = () => {
+    if (!dots.length || !swipeTrack.clientWidth) return;
+    const index = Math.max(0, Math.min(dots.length - 1, Math.round(swipeTrack.scrollLeft / swipeTrack.clientWidth)));
+    dots.forEach((dot, dotIndex) => {
+      const isActive = dotIndex === index;
+      dot.classList.toggle("is-active", isActive);
+      dot.setAttribute("aria-current", isActive ? "true" : "false");
+    });
+  };
+  swipeTrack.addEventListener("scroll", markActiveDot, { passive: true });
+  dots.forEach((dot) => {
+    dot.addEventListener("click", () => {
+      pages[Number(dot.dataset.swipeDot)]?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+    });
+  });
+  markActiveDot();
 }

@@ -52,9 +52,10 @@
           <td class="date-cell">{{ expense.expense_date }}</td>
           <td class="description-cell">{{ expense.description or '—' }}</td>
           <td class="action-cell">
-            <a class="text-action" href="{{ url_for('edit_expense', expense_id=expense.id) }}">Edit</a>
+            <a class="text-action" href="{{ url_for('edit_expense', expense_id=expense.id, return_to=request.full_path) }}">Edit</a>
             <form action="{{ url_for('delete_expense', expense_id=expense.id) }}" method="post" data-confirm="Delete this expense? This cannot be undone.">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="return_to" value="{{ request.full_path }}">
               <button class="text-action text-action-danger" type="submit">Delete</button>
             </form>
           </td>

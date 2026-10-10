@@ -1,0 +1,134 @@
+{% macro dashboard_money(value) -%}
+{{ format_money(value)[:-3] if format_money(value).endswith('.00') else format_money(value) }}
+{%- endmacro %}
+{% macro expense_icon(tone) %}
+<svg viewBox="0 0 24 24" aria-hidden="true">
+  {% if tone == "food" %}
+  <path d="M7 8h8v3a4 4 0 0 1-8 0z"/><path d="M15 9h2.2a2 2 0 0 1 0 4H15"/><path d="M8 19h8"/>
+  {% elif tone == "transport" %}
+  <path d="M4 14l2-5h12l2 5"/><path d="M5 14h14v4H5z"/><circle cx="8" cy="18" r="1.2"/><circle cx="16" cy="18" r="1.2"/>
+  {% elif tone == "shopping" %}
+  <path d="M6 8h12l-1 12H7z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>
+  {% elif tone == "utilities" %}
+  <path d="M13 3 6 13h6l-1 8 7-10h-6z"/>
+  {% elif tone == "health" %}
+  <path d="M12 19s-7-4.4-7-9a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 4.6-7 9-7 9z"/>
+  {% elif tone == "entertainment" %}
+  <path d="M4 9a2 2 0 0 0 2-2h12a2 2 0 0 0 2 2v1.5a2 2 0 0 1 0 4V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2.5a2 2 0 0 0 0-4z"/>
+  {% elif tone == "housing" %}
+  <path d="M4 11 12 4l8 7"/><path d="M6 10.5V20h12v-9.5"/>
+  {% elif tone == "education" %}
+  <path d="M5 6h6a3 3 0 0 1 3 3v10H8a3 3 0 0 0-3 3z"/><path d="M19 6h-6a3 3 0 0 0-3 3v10h6a3 3 0 0 1 3 3z"/>
+  {% else %}
+  <path d="M4 12V5h7l9 9-7 7z"/><circle cx="9" cy="9" r="1"/>
+  {% endif %}
+</svg>
+{% endmacro %}
+{% macro expense_actions(expense) %}
+<div class="expense-action-popover" role="menu" hidden>
+  <div class="expense-action-summary">
+    <strong>{{ expense.name }}</strong>
+    <span>{{ dashboard_money(expense.amount) }} · {{ expense.display_date }}</span>
+  </div>
+  <a role="menuitem" href="{{ url_for('edit_expense', expense_id=expense.id, return_to=request.full_path) }}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="m16.5 3.5 4 4L8 20l-5 1 1-5z"/></svg>
+    Edit Expense
+  </a>
+  <form action="{{ url_for('delete_expense', expense_id=expense.id) }}" method="post" data-confirm="Delete this expense? This cannot be undone.">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="return_to" value="{{ request.full_path }}">
+    <button role="menuitem" type="submit">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M8 7l1 13h6l1-13"/></svg>
+      Delete Expense
+    </button>
+  </form>
+</div>
+{% endmacro %}
+<div data-expense-fragment data-month="{{ selected_month }}" data-year="{{ selected_year }}" data-day="{{ selected_day }}" data-page="{{ page }}">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-stack dashboard-expense-flash" role="status">
+      {% for category, message in messages %}
+      <p class="flash flash-{{ category }}">{{ message }}</p>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endwith %}
+
+  {% if visible_expenses %}
+  <div class="table-scroll dashboard-desktop-expenses">
+    <table class="dashboard-expense-table">
+      <thead>
+        <tr>
+          <th scope="col">Expense Name</th>
+          <th scope="col">Category</th>
+          <th scope="col">Amount</th>
+          <th scope="col">Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for expense in visible_expenses %}
+        <tr class="dashboard-expense-row" data-expense-row tabindex="0" aria-haspopup="menu" aria-expanded="false" aria-label="Show actions for {{ expense.name }}">
+          <td>
+            <span class="dashboard-expense-name">{{ expense.name }}</span>
+            {% if expense.subtitle %}<span class="dashboard-expense-description">{{ expense.subtitle }}</span>{% endif %}
+          </td>
+          <td><span class="dashboard-category category-{{ expense.tone }}">{{ expense.category }}</span></td>
+          <td class="dashboard-expense-amount">{{ dashboard_money(expense.amount) }}</td>
+          <td class="dashboard-expense-date">{{ expense.display_date }}{{ expense_actions(expense) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <ul class="dashboard-mobile-expenses" aria-label="Recent expenses">
+    {% for expense in visible_expenses %}
+    <li class="dashboard-mobile-expense" data-expense-row tabindex="0" aria-haspopup="menu" aria-expanded="false" aria-label="Show actions for {{ expense.name }}">
+      <span class="dashboard-mobile-expense-icon category-icon-{{ expense.tone }}" aria-hidden="true">{{ expense_icon(expense.tone) }}</span>
+      <div class="dashboard-mobile-expense-info">
+        <strong>{{ expense.name }}</strong>
+        <span class="dashboard-category category-{{ expense.tone }}">{{ expense.category }}</span>
+      </div>
+      <div class="dashboard-mobile-expense-value">
+        <strong>{{ dashboard_money(expense.amount) }}</strong>
+        <time datetime="{{ expense.expense_date }}">{{ expense.display_date }}</time>
+      </div>
+      {{ expense_actions(expense) }}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="dashboard-empty-state">
+    <p>No expenses found for {{ month_names[selected_month - 1] }} {{ selected_year }}{% if selected_day %}, day {{ selected_day }}{% endif %}.</p>
+    <button class="button button-primary" type="button" data-open-expense-modal>Add an expense</button>
+  </div>
+  {% endif %}
+
+  {% if matching_expense_count %}
+  <div class="dashboard-pagination">
+    <span>Showing <strong>{{ range_start }}–{{ range_end }}</strong> of <strong>{{ matching_expense_count }}</strong> {% if matching_expense_count == 1 %}expense{% else %}expenses{% endif %}</span>
+    <nav class="dashboard-page-list" aria-label="Expense pages">
+      {% if page > 1 %}
+      <a href="{{ url_for('dashboard', month=selected_month, year=selected_year, day=selected_day or none, page=page - 1) }}" data-expense-page="{{ page - 1 }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Previous</a>
+      {% else %}
+      <span class="is-disabled"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Previous</span>
+      {% endif %}
+      {% for page_number in page_numbers %}
+        {% if page_number is none %}
+        <span class="dashboard-page-gap" aria-hidden="true">…</span>
+        {% elif page_number == page %}
+        <span class="is-current" aria-current="page">{{ page_number }}</span>
+        {% else %}
+        <a href="{{ url_for('dashboard', month=selected_month, year=selected_year, day=selected_day or none, page=page_number) }}" data-expense-page="{{ page_number }}">{{ page_number }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if page < page_count %}
+      <a href="{{ url_for('dashboard', month=selected_month, year=selected_year, day=selected_day or none, page=page + 1) }}" data-expense-page="{{ page + 1 }}">Next<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
+      {% else %}
+      <span class="is-disabled">Next<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>
+      {% endif %}
+    </nav>
+  </div>
+  {% endif %}
+</div>

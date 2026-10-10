@@ -16,8 +16,6 @@ Maintain the SQLite schema and persistence behavior described in
 - `budgets`: owner user ID, month, year, amount, timestamps; unique per user,
   month, and year.
 
-The current schema does not contain a subcategory table or subcategory/expense
-type columns on expenses.
 
 ## Rules
 

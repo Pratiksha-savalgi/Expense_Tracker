@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Profile{% endblock %}
+{% block content %}
+<section class="dashboard-heading profile-heading">
+  <div>
+    <h1>Profile</h1>
+    <p class="page-lede">The account signed in to Spendwise.</p>
+  </div>
+</section>
+
+<section class="profile-card" aria-labelledby="profile-title">
+  <h2 id="profile-title" class="visually-hidden">Account details</h2>
+  <div>
+    <span>Username</span>
+    <strong>{{ profile_user.username }}</strong>
+  </div>
+  <div>
+    <span>Role</span>
+    <strong>{{ profile_user.role }}</strong>
+  </div>
+  <form action="{{ url_for('logout') }}" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="button button-outline" type="submit">Sign out</button>
+  </form>
+</section>
+{% endblock %}

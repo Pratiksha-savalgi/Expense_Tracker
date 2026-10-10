@@ -1,11 +1,12 @@
-from datetime import date
-from decimal import Decimal, InvalidOperation
-from functools import wraps
+import calendar
 import hmac
 import os
 import re
 import secrets
 import sqlite3
+from datetime import date
+from decimal import Decimal, InvalidOperation
+from functools import wraps
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -24,6 +25,7 @@ from database.database import (
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 USERNAME_PATTERN = re.compile(r"(?=.*[A-Za-z])(?=.*[0-9])(?=.*[_@])[A-Za-z0-9_@]{3,15}")
 PASSWORD_PATTERN = re.compile(r"(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9\s])\S{8,36}")
+AMOUNT_PATTERN = re.compile(r"(?:\d+(?:\.\d{1,2})?|\.\d{1,2})")
 COMMON_PASSWORDS = {
     "password123!",
     "password1!",
@@ -217,6 +219,8 @@ def parse_expense_form(form, user_id):
     except InvalidOperation:
         amount = None
         errors.append("Enter a valid amount greater than zero.")
+    if amount_text and not AMOUNT_PATTERN.fullmatch(amount_text):
+        errors.append("Enter a positive amount with no more than two decimal places.")
 
     category_id = None
     category_name = ""
@@ -646,6 +650,9 @@ def home():
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
+    if request.method == "GET" and session.get("user_id"):
+        return redirect(url_for("dashboard"))
+
     if request.method == "POST":
         username = request.form.get("username", "")
         role = request.form.get("role", "").strip()
@@ -712,6 +719,9 @@ def register():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    if request.method == "GET" and session.get("user_id"):
+        return redirect(url_for("dashboard"))
+
     if request.method == "POST":
         username = request.form.get("username", "")
         password = request.form.get("password", "")
@@ -799,37 +809,198 @@ def _render_dashboard(expense=None, modal_errors=None, modal_success=False, stat
     ), status
 
 
+def category_tone(name):
+    key = (name or "").lower()
+    if any(word in key for word in ("food", "dining", "grocer")):
+        return "food"
+    if any(word in key for word in ("transport", "cab", "travel")):
+        return "transport"
+    if "shop" in key:
+        return "shopping"
+    if any(word in key for word in ("util", "bill", "electric", "recharge", "internet", "mobile")):
+        return "utilities"
+    if any(word in key for word in ("health", "pharm", "medic")):
+        return "health"
+    if "entertain" in key:
+        return "entertainment"
+    if any(word in key for word in ("hous", "rent", "hostel")):
+        return "housing"
+    if any(word in key for word in ("educat", "book", "station")):
+        return "education"
+    return "other"
+
+
+def present_dashboard_expense(expense):
+    description = (expense["description"] or "").strip()
+    if "\n" in description:
+        name, subtitle = [part.strip() for part in description.split("\n", 1)]
+    else:
+        name = description or expense["category"]
+        subtitle = ""
+    display_date = (
+        date.fromisoformat(expense["expense_date"]).strftime("%b %d, %Y").replace(" 0", " ")
+    )
+    return {
+        **dict(expense),
+        "name": name or expense["category"],
+        "subtitle": subtitle,
+        "display_date": display_date,
+        "tone": category_tone(expense["category"]),
+    }
+
+
+def dashboard_page_numbers(current, total):
+    if total <= 0:
+        return []
+    if total <= 7:
+        return list(range(1, total + 1))
+    if current <= 3:
+        window = {1, 2, 3}
+    elif current >= total - 2:
+        window = {total - 2, total - 1, total}
+    else:
+        window = {current - 1, current, current + 1}
+    visible = sorted(number for number in window | {1, total} if 1 <= number <= total)
+    pages = []
+    previous = 0
+    for number in visible:
+        if previous and number - previous > 1:
+            pages.append(None)
+        pages.append(number)
+        previous = number
+    return pages
+
+
+@app.get("/profile")
+@login_required
+def profile_page():
+    with database_connection() as connection:
+        profile_user = connection.execute(
+            "SELECT username, role FROM users WHERE id = ?",
+            (session["user_id"],),
+        ).fetchone()
+    return render_template("profile.html", profile_user=profile_user)
+
+
 @app.get("/dashboard")
 @login_required
 def dashboard():
-    period = parse_month_period(request.args.get("period"))
-    selected_year, selected_month = (int(part) for part in period.split("-"))
-    budget = get_budget_summary(session["user_id"], selected_month, selected_year)
+    today = date.today()
+    selected_year = today.year
+    selected_month = today.month
+    selected_day = ""
+
     with database_connection() as connection:
-        recent_expenses = connection.execute(
+        expense_years = connection.execute(
+            "SELECT DISTINCT CAST(strftime('%Y', expense_date) AS INTEGER) AS year "
+            "FROM expenses WHERE user_id = ? ORDER BY year DESC",
+            (session["user_id"],),
+        ).fetchall()
+    year_options = sorted(
+        {today.year, *(int(row["year"]) for row in expense_years)},
+        reverse=True,
+    )
+
+    year_text = request.args.get("year", "").strip()
+    month_text = request.args.get("month", "").strip()
+    day_text = request.args.get("day", "").strip()
+    if year_text or month_text or day_text:
+        try:
+            selected_year = int(year_text)
+            selected_month = int(month_text)
+            if selected_year not in year_options or selected_month < 1 or selected_month > 12:
+                raise ValueError
+            if selected_year > today.year or (
+                selected_year == today.year and selected_month > today.month
+            ):
+                raise ValueError
+            if day_text:
+                selected_day_number = int(day_text)
+                selected_date = date(selected_year, selected_month, selected_day_number)
+                if selected_date > today:
+                    raise ValueError
+                selected_day = str(selected_day_number)
+        except (ValueError, TypeError):
+            selected_year = today.year
+            selected_month = today.month
+            selected_day = ""
+            flash("Choose a valid date period no later than today.", "error")
+
+    month_start = date(selected_year, selected_month, 1)
+    month_end = date(
+        selected_year + (selected_month == 12),
+        1 if selected_month == 12 else selected_month + 1,
+        1,
+    )
+    filter_start = (
+        date(selected_year, selected_month, int(selected_day))
+        if selected_day
+        else month_start
+    )
+    filter_end = (
+        date.fromordinal(filter_start.toordinal() + 1)
+        if selected_day
+        else month_end
+    )
+    budget_period = today.strftime("%Y-%m")
+    budget = get_budget_summary(session["user_id"], today.month, today.year)
+
+    try:
+        requested_page = int(request.args.get("page", "1"))
+    except (TypeError, ValueError):
+        requested_page = 1
+    requested_page = max(requested_page, 1)
+    page_size = 5
+
+    with database_connection() as connection:
+        expense_rows = connection.execute(
             "SELECT e.id, e.amount, COALESCE(c.name, e.category) AS category, "
             "e.expense_date, e.description "
             "FROM expenses e LEFT JOIN categories c ON c.id = e.category_id AND c.user_id = e.user_id "
-            "WHERE e.user_id = ? ORDER BY e.expense_date DESC, e.id DESC LIMIT 6",
-            (session["user_id"],),
+            "WHERE e.user_id = ? AND e.expense_date >= ? AND e.expense_date < ? "
+            "ORDER BY e.expense_date DESC, e.id DESC",
+            (session["user_id"], filter_start.isoformat(), filter_end.isoformat()),
         ).fetchall()
-    recent_expenses = [
-        {
-            **dict(expense),
-            "display_date": date.fromisoformat(expense["expense_date"])
-            .strftime("%b %d, %Y")
-            .replace(" 0", " "),
-        }
-        for expense in recent_expenses
-    ]
+    presented_expenses = [present_dashboard_expense(expense) for expense in expense_rows]
+    matching_expense_count = len(presented_expenses)
+    page_count = max(1, (matching_expense_count + page_size - 1) // page_size)
+    page = min(requested_page, page_count)
+    start_index = (page - 1) * page_size
+    visible_expenses = presented_expenses[start_index:start_index + page_size]
+    range_start = start_index + 1 if visible_expenses else 0
+    range_end = start_index + len(visible_expenses)
+
+    expense_fragment = request.headers.get("X-Dashboard-Fragment") == "expenses"
     return render_template(
-        "dashboard.html",
+        "_dashboard_expense_results.html" if expense_fragment else "dashboard.html",
         budget=budget,
-        recent_expenses=recent_expenses,
-        period=period,
-        period_label=date(selected_year, selected_month, 1).strftime("%B %Y"),
+        recent_expenses=visible_expenses,
+        visible_expenses=visible_expenses,
+        page=page,
+        page_count=page_count,
+        page_numbers=dashboard_page_numbers(page, page_count) if matching_expense_count else [],
+        range_start=range_start,
+        range_end=range_end,
+        period=budget_period,
+        period_label=date(today.year, today.month, 1).strftime("%B %Y"),
+        today=today.isoformat(),
         selected_month=selected_month,
         selected_year=selected_year,
+        current_year=today.year,
+        current_month=today.month,
+        selected_day=selected_day,
+        year_options=year_options,
+        month_names=[date(2000, month, 1).strftime("%B") for month in range(1, 13)],
+        day_options=range(
+            1,
+            min(
+                calendar.monthrange(selected_year, selected_month)[1],
+                today.day if (selected_year, selected_month) == (today.year, today.month) else 31,
+            ) + 1,
+        ),
+        matching_expense_count=matching_expense_count,
+        open_budget_modal=False if expense_fragment else session.pop("open_budget_modal", False),
+        budget_amount_input=None if expense_fragment else session.pop("budget_amount_input", None),
     )
 
 
@@ -1053,6 +1224,10 @@ def save_budget():
             raise ValueError
     except (InvalidOperation, ValueError, TypeError):
         flash("Enter a valid month, year, and budget amount with no more than two decimal places.", "error")
+        if request.form.get("return_to", "").strip() == "dashboard":
+            session["open_budget_modal"] = True
+            session["budget_amount_input"] = request.form.get("budget_amount", "")
+            return redirect(url_for("dashboard"))
         return redirect(url_for("budget_page"))
 
     with database_connection() as connection:
@@ -1064,6 +1239,8 @@ def save_budget():
         )
 
     flash("Monthly budget saved.", "success")
+    if request.form.get("return_to", "").strip() == "dashboard":
+        return redirect(url_for("dashboard"))
     return redirect(url_for("dashboard", period=f"{year:04d}-{month:02d}"))
 
 
@@ -1105,7 +1282,7 @@ def add_expense():
 
     amount_format_invalid = bool(
         amount_text
-        and not re.fullmatch(r"(?:\d+(?:\.\d{1,2})?|\.\d{1,2})", amount_text)
+        and not AMOUNT_PATTERN.fullmatch(amount_text)
     )
     if amount_format_invalid:
         errors.append("Enter a positive amount with no more than two decimal places.")
@@ -1121,7 +1298,11 @@ def add_expense():
     }
     values, validation_errors = parse_expense_form(form_data, user_id)
     for error in validation_errors:
-        if amount_format_invalid and error.startswith(("Enter a valid amount", "Amount must")):
+        if amount_format_invalid and error.startswith((
+            "Enter a valid amount",
+            "Amount must",
+            "Enter a positive amount",
+        )):
             continue
         if category_invalid and error.startswith(("Choose a valid category", "Choose a category or")):
             continue
@@ -1161,14 +1342,16 @@ def add_expense():
 @login_required
 def edit_expense(expense_id):
     categories = get_user_categories(session["user_id"])
+    submitted_return = request.values.get("return_to", "").strip()
+    return_to = safe_return_path(submitted_return) if submitted_return else ""
     with database_connection() as connection:
         expense = connection.execute(
             "SELECT id, amount, category, category_id, expense_date, description "
             "FROM expenses WHERE id = ? AND user_id = ?",
             (expense_id, session["user_id"]),
         ).fetchone()
-    if expense is None:
-        abort(404)
+        if expense is None:
+            abort(404)
 
         if request.method == "POST":
             values, errors = parse_expense_form(request.form, session["user_id"])
@@ -1180,14 +1363,21 @@ def edit_expense(expense_id):
                     expense={**dict(expense), **values},
                     categories=categories,
                     today=date.today().isoformat(),
+                    return_to=return_to,
                 ), 400
 
             save_expense(connection, session["user_id"], values, expense_id)
 
     if request.method == "POST":
         flash("Expense updated.", "success")
-        return redirect(url_for("dashboard"))
-    return render_template("edit_expense.html", expense=expense, categories=categories, today=date.today().isoformat())
+        return redirect(return_to or url_for("dashboard"))
+    return render_template(
+        "edit_expense.html",
+        expense=expense,
+        categories=categories,
+        today=date.today().isoformat(),
+        return_to=return_to,
+    )
 
 
 @app.post("/expenses/<int:expense_id>/delete")
@@ -1199,7 +1389,8 @@ def delete_expense(expense_id):
             (expense_id, session["user_id"]),
         )
     flash("Expense deleted.", "success")
-    return redirect(url_for("expenses"))
+    submitted_return = request.form.get("return_to", "").strip()
+    return redirect(safe_return_path(submitted_return) if submitted_return else url_for("expenses"))
 
 
 initialize_database()

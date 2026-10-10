@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
+{% block body_class %}dashboard-layout{% endblock %}
+{% block main_class %}dashboard-page{% endblock %}
 {% block content %}
 {% macro dashboard_money(value) -%}
 {{ format_money(value)[:-3] if format_money(value).endswith('.00') else format_money(value) }}
 {%- endmacro %}
+{% set utilization_width = [budget.utilization, 100]|min %}
 <div class="dashboard-page">
   <section class="dashboard-heading">
     <div>
@@ -19,18 +22,21 @@
     <div class="dashboard-budget-heading">
       <div>
         <h2 id="budget-panel-title">Budget Progress</h2>
-        <p>{{ period_label }}</p>
+        <p class="dashboard-period-sub">{{ period_label }}</p>
       </div>
-      <a href="{{ url_for('budget_page', period=period) }}" class="dashboard-edit-budget">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="m16.5 3.5 4 4L8 20l-5 1 1-5z"/></svg>
-        Edit budget
-      </a>
+      <div class="dashboard-budget-actions">
+        <p class="dashboard-period-aside">{{ period_label }}</p>
+        <button class="dashboard-edit-budget" type="button" data-open-budget-modal>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="m16.5 3.5 4 4L8 20l-5 1 1-5z"/></svg>
+          Edit budget
+        </button>
+      </div>
     </div>
     <div class="dashboard-budget-content">
       <div class="dashboard-budget-stats">
         <div>
           <span>Total Budget</span>
-          <strong>{% if budget.budget_amount is not none %}{{ dashboard_money(budget.budget_amount) }}{% else %}Not set{% endif %}</strong>
+          <strong>{{ dashboard_money(budget.budget_amount if budget.budget_amount is not none else 0) }}</strong>
         </div>
         <div>
           <span>Amount Spent</span>
@@ -38,7 +44,7 @@
         </div>
         <div>
           <span>Remaining</span>
-          <strong>{% if budget.remaining is not none %}{{ dashboard_money(budget.remaining) }}{% else %}—{% endif %}</strong>
+          <strong>{{ dashboard_money(budget.remaining if budget.remaining is not none else 0) }}</strong>
         </div>
       </div>
       <div class="dashboard-utilization">
@@ -47,9 +53,10 @@
           <strong>{{ '%.1f'|format(budget.utilization) }}%</strong>
         </div>
         <div class="dashboard-utilization-track" role="progressbar" aria-label="Budget utilization"
-             aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ [budget.utilization, 100]|min }}">
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ utilization_width }}"
+             aria-valuetext="{{ '%.1f'|format(budget.utilization) }}%">
           <span class="dashboard-utilization-fill dashboard-utilization-{{ budget.status }}"
-                style="width: {{ [budget.utilization, 100]|min }}%"></span>
+                style="width: {{ utilization_width }}%"></span>
         </div>
       </div>
     </div>
@@ -57,53 +64,60 @@
 
   <section class="dashboard-recent-card" aria-labelledby="recent-expenses-title">
     <div class="dashboard-recent-heading">
-      <div>
-        <h2 id="recent-expenses-title">Recent Expenses</h2>
-        <p>Your latest recorded spending</p>
+      <div class="dashboard-list-title">
+        <div>
+          <h2 id="recent-expenses-title">Recent Expenses</h2>
+          <p>Your latest recorded spending</p>
+        </div>
       </div>
-      <a href="{{ url_for('expenses') }}">View all <span aria-hidden="true">→</span></a>
+      <form class="dashboard-filters" method="get" action="{{ url_for('dashboard') }}"
+            data-dashboard-filters data-today="{{ today }}" data-years="{{ year_options|join(',') }}">
+        <input type="hidden" name="page" value="{{ page }}">
+        <input type="hidden" name="year" value="{{ selected_year }}">
+        <input type="hidden" name="month" value="{{ selected_month }}">
+        <input type="hidden" name="day" value="{{ selected_day }}">
+        <label class="visually-hidden" for="dashboard-day">Day</label>
+        <input id="dashboard-day" type="date" data-dashboard-calendar max="{{ today }}"
+               aria-label="Choose a day on the calendar. Leave it empty to show every day in the current month."
+               {% if selected_day %}value="{{ '%04d-%02d-%02d'|format(selected_year, selected_month, selected_day|int) }}"{% endif %}>
+        <button class="dashboard-refresh" type="submit" aria-label="Clear filters and show recent expenses" title="Clear filters">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5"/><path d="M4.9 9a7.5 7.5 0 0 1 12.7-2L20 12"/><path d="M4 17v-5h5"/><path d="M19.1 15a7.5 7.5 0 0 1-12.7 2L4 12"/></svg>
+        </button>
+      </form>
     </div>
-    {% if recent_expenses %}
-    <div class="table-scroll">
-      <table class="dashboard-expense-table">
-        <thead>
-          <tr>
-            <th scope="col">Expense Name</th>
-            <th scope="col">Category</th>
-            <th scope="col">Amount</th>
-            <th scope="col">Date</th>
-            <th scope="col"><span class="visually-hidden">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for expense in recent_expenses %}
-          <tr>
-            <td>
-              <span class="dashboard-expense-name">{{ expense.description or expense.category }}</span>
-            </td>
-            <td><span class="dashboard-category">{{ expense.category }}</span></td>
-            <td class="dashboard-expense-amount">{{ dashboard_money(expense.amount) }}</td>
-            <td class="dashboard-expense-date">{{ expense.display_date }}</td>
-            <td class="dashboard-expense-actions">
-              <a href="{{ url_for('edit_expense', expense_id=expense.id) }}" aria-label="Edit {{ expense.description or expense.category }}">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="m16.5 3.5 4 4L8 20l-5 1 1-5z"/></svg>
-              </a>
-              <form action="{{ url_for('delete_expense', expense_id=expense.id) }}" method="post"
-                    data-confirm="Delete this expense? This cannot be undone.">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" aria-label="Delete {{ expense.description or expense.category }}">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2m3 0-1 14H6L5 6"/><path d="M10 11v5m4-5v5"/></svg>
-                </button>
-              </form>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+
+    <div data-expense-results>
+      {% include "_dashboard_expense_results.html" %}
     </div>
-    {% else %}
-    <div class="dashboard-empty-state">No expenses recorded yet.</div>
-    {% endif %}
   </section>
 </div>
+
+<dialog class="budget-modal" data-budget-modal data-auto-open="{{ 'true' if open_budget_modal else 'false' }}" aria-labelledby="budget-modal-title">
+  <form method="post" action="{{ url_for('save_budget') }}" data-budget-form>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="period" value="{{ '%04d-%02d'|format(budget.year, budget.month) }}">
+    <input type="hidden" name="return_to" value="dashboard">
+    <div class="budget-modal-header">
+      <div>
+        <h2 id="budget-modal-title">Edit budget</h2>
+        <p>{{ period_label }}</p>
+      </div>
+      <button class="expense-modal-close" type="button" data-close-budget-modal aria-label="Close edit budget">×</button>
+    </div>
+    <label for="dashboard-budget-amount">Budget amount</label>
+    <div class="amount-input">
+      <span aria-hidden="true">₹</span>
+      <input id="dashboard-budget-amount" name="budget_amount" type="number" min="0.01" step="0.01" inputmode="decimal" required
+             value="{{ budget_amount_input if budget_amount_input is not none else (budget.budget_amount if budget.budget_amount is not none else '') }}"
+             placeholder="0.00">
+    </div>
+    <div class="form-actions">
+      <button class="button button-primary" type="submit">Save budget</button>
+    </div>
+  </form>
+</dialog>
+
+<button class="dashboard-mobile-add" type="button" data-open-expense-modal aria-label="Add expense">
+  <span aria-hidden="true">+</span>
+</button>
 {% endblock %}
