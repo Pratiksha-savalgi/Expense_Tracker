@@ -22,10 +22,6 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
           <span>Dashboard</span>
         </a>
-        <a class="side-link {% if request.endpoint == 'analytics_page' %}is-active{% endif %}" href="{{ url_for('analytics_page') }}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg>
-          <span>Analytics</span>
-        </a>
       </nav>
       <div class="sidebar-account">
         <a class="side-link {% if request.endpoint == 'profile_page' %}is-active{% endif %}" href="{{ url_for('profile_page') }}">
@@ -70,10 +66,6 @@
         <a href="{{ url_for('dashboard') }}" {% if request.endpoint == 'dashboard' %}aria-current="page"{% endif %}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
           <span>Dashboard</span>
-        </a>
-        <a href="{{ url_for('analytics_page') }}" {% if request.endpoint == 'analytics_page' %}aria-current="page"{% endif %}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg>
-          <span>Analytics</span>
         </a>
         <a href="{{ url_for('profile_page') }}" {% if request.endpoint == 'profile_page' %}aria-current="page"{% endif %}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3"/><path d="M5.5 19c1.4-2.8 3.6-4 6.5-4s5.1 1.2 6.5 4"/></svg>
