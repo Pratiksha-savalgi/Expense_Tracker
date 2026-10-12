@@ -44,7 +44,17 @@
   </form>
 </div>
 {% endmacro %}
-<div data-expense-fragment data-month="{{ selected_month }}" data-year="{{ selected_year }}" data-day="{{ selected_day }}" data-page="{{ page }}">
+{% set utilization_width = [budget.utilization, 100]|min %}
+<div data-expense-fragment data-month="{{ selected_month }}" data-year="{{ selected_year }}" data-day="{{ selected_day }}" data-page="{{ page }}"
+     data-period-label="{{ period_label }}"
+     data-budget-total="{{ dashboard_money(budget.budget_amount if budget.budget_amount is not none else 0) }}"
+     data-budget-spent="{{ dashboard_money(budget.total_spent) }}"
+     data-budget-remaining="{{ dashboard_money(budget.remaining if budget.remaining is not none else 0) }}"
+     data-budget-percent="{{ '%.1f'|format(budget.utilization) }}%"
+     data-budget-width="{{ utilization_width }}"
+     data-budget-status="{{ budget.status }}"
+     data-budget-input="{{ budget.budget_amount if budget.budget_amount is not none else '' }}"
+     data-budget-amounts="{{ budget_amounts_by_month|tojson|forceescape }}">
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
     <div class="flash-stack dashboard-expense-flash" role="status">

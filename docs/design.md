@@ -210,7 +210,7 @@ The section provides:
 - Calendar date filter. Any day up to today can be chosen. The calendar cannot select a future date. Leave it empty to show every day in the current month.
 - Reset action. Clears the calendar filter and shows the recent expenses for the current month.
 
-Changing the calendar or using Reset updates only the expense records in this section. The rest of the Dashboard stays as it is.
+Choosing a date renames this section to Expenses and updates Budget Progress to the selected month. Reset restores the Recent Expenses title and the current month.
 
 Expense records are displayed in descending order by date (most recent first).
 
@@ -327,13 +327,12 @@ preserving active filters.
 
 Reference screenshots are available in the `visuals/Analytics/` folder.
 
-Analytics provides Year, Month, Day, and Category filters; a category
-distribution and spending summary; and a monthly spending-versus-budget chart.
-The chart shows January through the current month for the current year and all
-months for a past year. Each point reveals its budget, spending, remaining
-amount, and budget status on desktop hover/focus or touch-screen tap. The day
-filter narrows the selected-period summary and category distribution, not the
-monthly chart.
+Analytics provides Year, Month, and Category filters; a category
+distribution and spending summary; and a monthly spending-versus-budget chart
+titled with the selected year. The chart shows January through the current
+month for the current year and all months for a past year. Each point reveals
+its budget, spending, remaining amount, and budget status on desktop
+hover/focus or touch-screen tap.
 
 Future months and years are unavailable. Invalid period selections are rejected
 and reset to a valid period with user feedback.

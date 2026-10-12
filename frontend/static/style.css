@@ -461,6 +461,8 @@ th:last-child, td:last-child { padding-right: 25px; }
 .expense-modal-form input, .expense-modal-form select { min-height: 42px; }
 .expense-modal-form textarea { min-height: 64px; }
 .expense-modal-form .form-actions { margin-top: 2px; padding-top: 12px; }
+.expense-amount-error { margin: 6px 0 0; color: #b42318; font-size: 12px; line-height: 1.35; }
+.expense-amount-error[hidden] { display: none; }
 .expense-modal-errors { margin-bottom: 16px; padding: 9px 12px; color: #87392e; border-left: 3px solid var(--coral); background: #fff4f1; font-size: 13px; }
 .expense-modal-errors p { margin: 2px 0; }
 .expense-save-success { position: absolute; z-index: 2; inset: 0; padding: 24px; display: grid; place-items: center; border-radius: inherit; background: rgb(255 255 255 / 97%); text-align: center; }
@@ -537,7 +539,7 @@ th:last-child, td:last-child { padding-right: 25px; }
 .records-section td { padding-top: 13px; padding-bottom: 13px; }
 .records-section .category-label { border-left: 0; border-radius: 12px; }
 .analytics-heading { margin-bottom: 23px; }
-.analytics-filters { margin-bottom: 18px; padding: 17px 16px; display: grid; grid-template-columns: repeat(4, minmax(115px, 1fr)) auto; align-items: end; gap: 11px; border: 1px solid #e0e4e1; border-radius: 12px; background: #fff; box-shadow: 0 1px 2px rgb(34 48 40 / 5%); }
+.analytics-filters { margin-bottom: 18px; padding: 17px 16px; display: grid; grid-template-columns: repeat(3, minmax(115px, 1fr)) auto; align-items: end; gap: 11px; border: 1px solid #e0e4e1; border-radius: 12px; background: #fff; box-shadow: 0 1px 2px rgb(34 48 40 / 5%); }
 .analytics-filters .filter-field { min-width: 0; }
 .analytics-filters .filter-field label { color: var(--ink); font-weight: 600; }
 .analytics-filters select { min-height: 40px; padding: 7px 10px; font-size: 12px; }
@@ -1545,7 +1547,7 @@ button.dashboard-edit-budget:hover { color: #15803d; background: #f5f7f6; }
 .analytics-page .annual-chart-help { margin: 4px 14px 0; }
 
 @media (min-width: 821px) and (max-width: 1100px) {
-  .analytics-page .analytics-filters { grid-template-columns: repeat(4, minmax(0, 1fr)) auto; }
+  .analytics-page .analytics-filters { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; }
   .analytics-page .analytics-filter-actions { grid-column: auto; }
 }
 

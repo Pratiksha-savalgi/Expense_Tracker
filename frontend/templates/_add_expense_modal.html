@@ -22,8 +22,9 @@
       <label for="modal-amount">Amount <span class="required-mark">*</span></label>
       <div class="amount-input">
         <span aria-hidden="true">₹</span>
-        <input id="modal-amount" name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" required value="{{ modal_expense.amount }}" placeholder="0.00">
+        <input id="modal-amount" name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" required value="{{ modal_expense.amount }}" placeholder="0.00" aria-describedby="modal-amount-error">
       </div>
+      <p id="modal-amount-error" class="expense-amount-error" role="alert" hidden></p>
     </div>
     <div class="field">
       <label for="modal-category">Category <span class="required-mark">*</span></label>

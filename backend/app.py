@@ -966,13 +966,6 @@ def dashboard():
             "FROM expenses WHERE user_id = ? ORDER BY year DESC",
             (session["user_id"],),
         ).fetchall()
-        budget_rows = connection.execute(
-            "SELECT month, budget_amount FROM budgets WHERE user_id = ? AND year = ?",
-            (session["user_id"], today.year),
-        ).fetchall()
-    budget_amounts_by_month = {
-        int(row["month"]): row["budget_amount"] for row in budget_rows
-    }
     year_options = sorted(
         {today.year, *(int(row["year"]) for row in expense_years)},
         reverse=True,
@@ -1019,8 +1012,16 @@ def dashboard():
         if selected_day
         else month_end
     )
-    budget_period = today.strftime("%Y-%m")
-    budget = get_budget_summary(session["user_id"], today.month, today.year)
+    budget_period = f"{selected_year:04d}-{selected_month:02d}"
+    budget = get_budget_summary(session["user_id"], selected_month, selected_year)
+    with database_connection() as connection:
+        budget_rows = connection.execute(
+            "SELECT month, budget_amount FROM budgets WHERE user_id = ? AND year = ?",
+            (session["user_id"], selected_year),
+        ).fetchall()
+    budget_amounts_by_month = {
+        int(row["month"]): row["budget_amount"] for row in budget_rows
+    }
 
     try:
         requested_page = int(request.args.get("page", "1"))
@@ -1059,7 +1060,7 @@ def dashboard():
         range_start=range_start,
         range_end=range_end,
         period=budget_period,
-        period_label=date(today.year, today.month, 1).strftime("%B %Y"),
+        period_label=date(selected_year, selected_month, 1).strftime("%B %Y"),
         budget_amounts_by_month=budget_amounts_by_month,
         today=today.isoformat(),
         selected_month=selected_month,
@@ -1175,17 +1176,6 @@ def analytics_page():
         flash("Analytics can only be viewed up to the current month and year.", "error")
         selected_year, selected_month = today.year, today.month
 
-    raw_day = "" if date_range else request.args.get("day", "").strip()
-    try:
-        selected_day = int(raw_day) if raw_day else None
-        if selected_day is not None:
-            date(selected_year, selected_month, selected_day)
-            if date(selected_year, selected_month, selected_day) > today:
-                raise ValueError
-    except (ValueError, TypeError):
-        flash("Choose a valid day for analytics.", "error")
-        selected_day = None
-
     categories = get_user_categories(session["user_id"])
     category_filter = request.args.get("category", "").strip()
     category_ids = {str(category["id"]) for category in categories}
@@ -1198,7 +1188,7 @@ def analytics_page():
         session["user_id"],
         selected_year,
         selected_month,
-        selected_day,
+        None,
         selected_category_id,
         start_date=date_range[0] if date_range else None,
         end_date=date_range[1] if date_range else None,
@@ -1223,19 +1213,11 @@ def analytics_page():
         category_filter=category_filter,
         selected_year=selected_year,
         selected_month=selected_month,
-        selected_day=selected_day,
         date_label=date_label,
         date_period=date_period,
         date_filter=date_filter,
         month_names=calendar.month_name,
         month_options=range(1, 13),
-        day_options=range(
-            1,
-            min(
-                calendar.monthrange(selected_year, selected_month)[1],
-                today.day if (selected_year, selected_month) == (today.year, today.month) else 31,
-            ) + 1,
-        ),
         year_options=year_options,
         analytics=analytics,
         annual_chart=annual_chart,

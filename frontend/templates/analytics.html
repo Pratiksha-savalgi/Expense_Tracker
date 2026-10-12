@@ -37,15 +37,6 @@
     </select>
   </div>
   <div class="filter-field">
-    <label for="analytics-day">Day</label>
-    <select id="analytics-day" name="day">
-      <option value="">All days</option>
-      {% for day_number in day_options %}
-      <option value="{{ day_number }}" {% if day_number == selected_day %}selected{% endif %}>{{ day_number }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="filter-field">
     <label for="analytics-category">Category</label>
     <select id="analytics-category" name="category">
       <option value="">All categories</option>
@@ -65,7 +56,7 @@
     <div>
       <h2 id="distribution-title">Category-wise distribution</h2>
       <p class="page-lede">
-        {% if date_label %}{{ date_label }}{% else %}{{ month_names[selected_month] }} {{ selected_year }}{% if selected_day %} · day {{ selected_day }}{% endif %}{% endif %}
+        {% if date_label %}{{ date_label }}{% else %}{{ month_names[selected_month] }} {{ selected_year }}{% endif %}
         {% if category_filter %} · {{ analytics.highest_category.category if analytics.highest_category else 'Selected category' }}{% else %} · all categories{% endif %}
       </p>
     </div>
@@ -103,7 +94,7 @@
 <section class="analytics-panel annual-spending-panel" aria-labelledby="annual-spending-title">
   <div class="records-heading">
     <div>
-      <h2 id="annual-spending-title">Monthly spending vs budget</h2>
+      <h2 id="annual-spending-title">Monthly spending vs budget {{ selected_year }}</h2>
       <p class="page-lede">
         Monthly budget compared with amount spent · {{ selected_year }}
         {% if category_filter %} · {{ analytics.highest_category.category if analytics.highest_category else 'selected category' }}{% endif %}

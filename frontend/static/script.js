@@ -260,8 +260,23 @@ if (expenseModal) {
     if (modalDatePicker.value) setActiveDatePeriod("custom");
   });
 
+  const amountInput = modalForm.querySelector("#modal-amount");
+  const amountError = modalForm.querySelector("#modal-amount-error");
+  const warnUnlessAmountIsPositive = () => {
+    const raw = amountInput.value.trim();
+    const message = raw !== "" && Number(raw) <= 0 ? "Amount must be greater than zero." : "";
+    if (amountError) {
+      amountError.textContent = message;
+      amountError.hidden = !message;
+    }
+    amountInput.setAttribute("aria-invalid", String(Boolean(message)));
+    if (message) amountInput.setCustomValidity(message);
+    else if (amountInput.validationMessage === "Amount must be greater than zero.") amountInput.setCustomValidity("");
+  };
+  amountInput.addEventListener("input", warnUnlessAmountIsPositive);
+
   modalForm.addEventListener("submit", (event) => {
-    const amountInput = modalForm.querySelector("#modal-amount");
+    warnUnlessAmountIsPositive();
     if (!amountInput.value) {
       amountInput.setCustomValidity("Enter an amount.");
     } else if (Number(amountInput.value) <= 0) {
@@ -388,7 +403,15 @@ if (expenseForm) {
   });
   updateNewCategoryField();
 
+  const amountError = expenseForm.querySelector("#amount-error");
   amountInput.addEventListener("input", () => {
+    const raw = amountInput.value.trim();
+    const notPositive = raw !== "" && Number(raw) <= 0;
+    if (amountError) {
+      amountError.textContent = notPositive ? "Amount must be greater than zero." : "";
+      amountError.hidden = !notPositive;
+    }
+    amountInput.setAttribute("aria-invalid", String(notPositive));
     if (!amountInput.value) {
       amountInput.setCustomValidity("Enter an amount.");
     } else if (Number(amountInput.value) <= 0) {
@@ -457,6 +480,53 @@ if (dashboardFilters) {
   const expenseSection = results.closest(".dashboard-recent-card");
   let expenseRequest = 0;
 
+  const applyFilteredDashboard = (fragment) => {
+    const title = document.querySelector("#recent-expenses-title");
+    if (title) title.textContent = fragment.dataset.day ? "Expenses" : "Recent Expenses";
+    document.querySelectorAll("[data-budget-period]").forEach((label) => {
+      if (fragment.dataset.periodLabel) label.textContent = fragment.dataset.periodLabel;
+    });
+    const write = (selector, value) => {
+      const element = document.querySelector(selector);
+      if (element && value != null) element.textContent = value;
+    };
+    write("[data-budget-total]", fragment.dataset.budgetTotal);
+    write("[data-budget-spent]", fragment.dataset.budgetSpent);
+    write("[data-budget-remaining]", fragment.dataset.budgetRemaining);
+    write("[data-budget-percent]", fragment.dataset.budgetPercent);
+    const fill = document.querySelector("[data-budget-fill]");
+    const track = document.querySelector(".dashboard-utilization-track");
+    if (fill && fragment.dataset.budgetWidth != null) {
+      fill.style.width = `${fragment.dataset.budgetWidth}%`;
+      fill.className = `dashboard-utilization-fill dashboard-utilization-${fragment.dataset.budgetStatus || "healthy"}`;
+    }
+    if (track && fragment.dataset.budgetPercent) {
+      track.setAttribute("aria-valuenow", fragment.dataset.budgetWidth || "0");
+      track.setAttribute("aria-valuetext", fragment.dataset.budgetPercent);
+    }
+    const budgetModal = document.querySelector("[data-budget-modal]");
+    if (!budgetModal || budgetModal.open) return;
+    const budgetYear = budgetModal.querySelector('input[name="year"]');
+    const budgetMonth = budgetModal.querySelector("[data-budget-month]");
+    const budgetAmount = budgetModal.querySelector("#dashboard-budget-amount");
+    if (budgetYear && fragment.dataset.year) budgetYear.value = fragment.dataset.year;
+    if (budgetMonth && fragment.dataset.budgetAmounts) {
+      try {
+        const amounts = JSON.parse(fragment.dataset.budgetAmounts);
+        [...budgetMonth.options].forEach((option) => {
+          option.dataset.budgetAmount = amounts[option.value] ?? "";
+        });
+      } catch (error) {
+        /* Keep the month amounts already shown if the payload cannot be read. */
+      }
+      if (fragment.dataset.month) budgetMonth.value = fragment.dataset.month;
+    }
+    if (budgetAmount) {
+      budgetAmount.value = fragment.dataset.budgetInput || "";
+      budgetAmount.setCustomValidity("");
+    }
+  };
+
   const refreshExpenseList = async () => {
     const requestId = expenseRequest + 1;
     expenseRequest = requestId;
@@ -476,6 +546,7 @@ if (dashboardFilters) {
         if (fragment.dataset.month) monthInput.value = fragment.dataset.month;
         dayInput.value = fragment.dataset.day || "";
         syncDashboardOptions();
+        applyFilteredDashboard(fragment);
         if (pageInput) pageInput.value = fragment.dataset.page || "1";
       }
       if (requestId === expenseRequest) window.history.replaceState(null, "", url);
@@ -536,7 +607,6 @@ if (analyticsFilters) {
   const currentMonth = today.getMonth() + 1;
   const yearSelect = analyticsFilters.querySelector('[name="year"]');
   const monthSelect = analyticsFilters.querySelector('[name="month"]');
-  const daySelect = analyticsFilters.querySelector('[name="day"]');
 
   const syncMonthOptions = () => {
     const selectedYear = Number(yearSelect.value || currentYear);
@@ -553,27 +623,8 @@ if (analyticsFilters) {
     }
   };
 
-  const updateDays = (preserveSelection) => {
-    const previousDay = preserveSelection ? daySelect.value : "";
-    const dayCount = new Date(Number(yearSelect.value), Number(monthSelect.value), 0).getDate();
-    const maxDay = Number(yearSelect.value) === currentYear
-      && Number(monthSelect.value) === currentMonth
-      ? Math.min(dayCount, today.getDate())
-      : dayCount;
-    daySelect.replaceChildren(new Option("All days", ""));
-    for (let day = 1; day <= maxDay; day += 1) {
-      daySelect.add(new Option(String(day), String(day)));
-    }
-    if (Number(previousDay) <= maxDay) daySelect.value = previousDay;
-  };
-
-  yearSelect.addEventListener("change", () => {
-    syncMonthOptions();
-    updateDays(true);
-  });
-  monthSelect.addEventListener("change", () => updateDays(true));
+  yearSelect.addEventListener("change", syncMonthOptions);
   syncMonthOptions();
-  updateDays(true);
 }
 
 const closeExpenseMenus = () => {

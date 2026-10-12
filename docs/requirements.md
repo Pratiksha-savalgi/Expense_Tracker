@@ -149,8 +149,8 @@ today when creating an expense. Deletion requires browser confirmation.
 - The Dashboard displays a Recent Expenses section.
 - The Recent Expenses section provides a calendar date filter. An empty calendar shows every day in the current month.
 - The expense list refreshes automatically when a filter changes.
-- The reset control clears the calendar filter and shows the recent expenses for the current month.
-- Reset and filter changes update only the Recent Expenses records, not the rest of the Dashboard.
+- The reset control clears the calendar filter, restores the Recent Expenses title, and shows the current month.
+- Choosing a date changes the section title to Expenses and updates Budget Progress to that date's month.
 - Five expenses are shown per page, newest first, with previous and next navigation.
 - Only expenses belonging to the signed-in user are displayed.
 - Records are displayed newest first.
@@ -163,7 +163,7 @@ today when creating an expense. Deletion requires browser confirmation.
 
 ## Analytics
 
-- Analytics can be filtered by year, month, day, and category.
+- Analytics can be filtered by year, month, and category.
 - Analytics show selected-period spending, expense count, average expense,
   category totals and percentages, and the highest-spending category.
 - Analytics show a monthly spending-versus-budget chart for the selected year.
@@ -172,13 +172,11 @@ today when creating an expense. Deletion requires browser confirmation.
   spent amount, remaining amount, and under/over-budget status, appear on
   hover/focus on desktop and on tap on touch screens.
 - The category filter applies to the selected-period summary, category
-  distribution, and yearly spending series. The day filter narrows the
-  selected-period summary and category distribution only; monthly chart values
-  remain full-month totals.
+  distribution, and yearly spending series. Monthly chart values remain
+  full-month totals.
 - Analytics for a future year or a future month in the current year are not
   allowed. The latest selectable period is the current month of the current
   year.
-- A selected day must be a valid calendar day and cannot be later than today.
 - Invalid future or malformed period selections are rejected and reset to a
   safe period with user feedback.
 - Empty periods show a useful empty state.
@@ -270,7 +268,7 @@ today when creating an expense. Deletion requires browser confirmation.
 
 - The Recent Expenses section displays only the signed-in user's expenses.
 - The calendar date filter returns the correct expense records.
-- Changing a filter refreshes the expense list automatically.
+- Changing a filter refreshes the expense list and updates Budget Progress to the selected month.
 - Future years, future months, and invalid dates are rejected.
 - Empty filter results display a useful empty state.
 
@@ -286,7 +284,7 @@ today when creating an expense. Deletion requires browser confirmation.
  
 - Analytics display spending, expense count, average expense, category totals, and category percentages correctly.
 - Analytics display the highest-spending category for the selected period.
-- Year, Month, Day, and Category filters return accurate results.
+- Year, Month, and Category filters return accurate results.
 - Monthly spending and budget chart values use the correct user-scoped data.
 - Future years, future months, and invalid dates are rejected.
 - Empty periods display a useful empty state.

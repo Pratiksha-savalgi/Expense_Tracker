@@ -18,7 +18,8 @@
     <div class="field-grid">
       <div class="field field-wide">
         <label for="amount">Amount <span class="required-mark">*</span></label>
-        <div class="amount-input"><span aria-hidden="true">₹</span><input id="amount" name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" required value="{{ expense.amount }}" placeholder="0.00"></div>
+        <div class="amount-input"><span aria-hidden="true">₹</span><input id="amount" name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" required value="{{ expense.amount }}" placeholder="0.00" aria-describedby="amount-error"></div>
+        <p id="amount-error" class="expense-amount-error" role="alert" hidden></p>
       </div>
       <div class="field">
         <label for="category">Category <span class="required-mark">*</span></label>

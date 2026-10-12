@@ -23,10 +23,10 @@
     <div class="dashboard-budget-heading">
       <div>
         <h2 id="budget-panel-title">Budget Progress</h2>
-        <p class="dashboard-period-sub">{{ period_label }}</p>
+        <p class="dashboard-period-sub" data-budget-period>{{ period_label }}</p>
       </div>
       <div class="dashboard-budget-actions">
-        <p class="dashboard-period-aside">{{ period_label }}</p>
+        <p class="dashboard-period-aside" data-budget-period>{{ period_label }}</p>
         <button class="dashboard-edit-budget" type="button" data-open-budget-modal>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="m16.5 3.5 4 4L8 20l-5 1 1-5z"/></svg>
           Edit budget
@@ -37,26 +37,26 @@
       <div class="dashboard-budget-stats">
         <div>
           <span>Total Budget</span>
-          <strong>{{ dashboard_money(budget.budget_amount if budget.budget_amount is not none else 0) }}</strong>
+          <strong data-budget-total>{{ dashboard_money(budget.budget_amount if budget.budget_amount is not none else 0) }}</strong>
         </div>
         <div>
           <span>Amount Spent</span>
-          <strong>{{ dashboard_money(budget.total_spent) }}</strong>
+          <strong data-budget-spent>{{ dashboard_money(budget.total_spent) }}</strong>
         </div>
         <div>
           <span>Remaining</span>
-          <strong>{{ dashboard_money(budget.remaining if budget.remaining is not none else 0) }}</strong>
+          <strong data-budget-remaining>{{ dashboard_money(budget.remaining if budget.remaining is not none else 0) }}</strong>
         </div>
       </div>
       <div class="dashboard-utilization">
         <div>
           <span>Utilization</span>
-          <strong>{{ '%.1f'|format(budget.utilization) }}%</strong>
+          <strong data-budget-percent>{{ '%.1f'|format(budget.utilization) }}%</strong>
         </div>
         <div class="dashboard-utilization-track" role="progressbar" aria-label="Budget utilization"
              aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ utilization_width }}"
              aria-valuetext="{{ '%.1f'|format(budget.utilization) }}%">
-          <span class="dashboard-utilization-fill dashboard-utilization-{{ budget.status }}"
+          <span class="dashboard-utilization-fill dashboard-utilization-{{ budget.status }}" data-budget-fill
                 style="width: {{ utilization_width }}%"></span>
         </div>
       </div>
@@ -67,7 +67,7 @@
     <div class="dashboard-recent-heading">
       <div class="dashboard-list-title">
         <div>
-          <h2 id="recent-expenses-title">Recent Expenses</h2>
+          <h2 id="recent-expenses-title">{% if selected_day %}Expenses{% else %}Recent Expenses{% endif %}</h2>
           <p>Your latest recorded spending</p>
         </div>
       </div>
@@ -101,7 +101,7 @@
     <div class="budget-modal-header">
       <div>
         <h2 id="budget-modal-title">Edit budget</h2>
-        <p>{{ period_label }}</p>
+        <p data-budget-period>{{ period_label }}</p>
       </div>
       <button class="expense-modal-close" type="button" data-close-budget-modal aria-label="Close edit budget">×</button>
     </div>
