@@ -22,6 +22,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
           <span>Dashboard</span>
         </a>
+        <a class="side-link {% if request.endpoint == 'analytics_page' %}is-active{% endif %}" href="{{ url_for('analytics_page') }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg>
+          <span>Analytics</span>
+        </a>
       </nav>
       <div class="sidebar-account">
         <a class="side-link {% if request.endpoint == 'profile_page' %}is-active{% endif %}" href="{{ url_for('profile_page') }}">
@@ -62,10 +66,41 @@
 
   {% if show_app_shell %}
       {% include "_add_expense_modal.html" %}
+      <button class="ai-launcher" type="button" data-ai-open aria-haspopup="dialog">
+        <span aria-hidden="true">✦</span>
+        <span>Ask SpendWise AI</span>
+      </button>
+      <dialog class="ai-dialog" data-ai-dialog data-api-url="{{ url_for('chat_api.chat') }}"
+        data-csrf-token="{{ csrf_token() }}" data-user-id="{{ session.get('user_id') }}"
+        aria-labelledby="ai-dialog-title">
+        <section class="ai-chat">
+          <header class="ai-chat-header">
+            <div>
+              <p class="eyebrow">SpendWise assistant</p>
+              <h2 id="ai-dialog-title">Ask SpendWise AI</h2>
+              <p>Insights from your spending and budget data.</p>
+            </div>
+            <button class="ai-close" type="button" data-ai-close aria-label="Close assistant">×</button>
+          </header>
+          <div class="ai-messages" data-ai-messages aria-live="polite" aria-relevant="additions"></div>
+          <p class="ai-status" data-ai-status role="status"></p>
+          <form class="ai-form" data-ai-form>
+            <label class="visually-hidden" for="ai-message">Your question</label>
+            <textarea id="ai-message" name="message" rows="2" maxlength="1000"
+              placeholder="Ask about your spending or budget…" required></textarea>
+            <button class="button button-primary" type="submit" data-ai-submit>Send</button>
+          </form>
+          <p class="ai-disclaimer">Read-only assistant · Uses your SpendWise records</p>
+        </section>
+      </dialog>
       <nav class="app-mobile-nav" aria-label="Mobile navigation">
         <a href="{{ url_for('dashboard') }}" {% if request.endpoint == 'dashboard' %}aria-current="page"{% endif %}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
           <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('analytics_page') }}" {% if request.endpoint == 'analytics_page' %}aria-current="page"{% endif %}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg>
+          <span>Analytics</span>
         </a>
         <a href="{{ url_for('profile_page') }}" {% if request.endpoint == 'profile_page' %}aria-current="page"{% endif %}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3"/><path d="M5.5 19c1.4-2.8 3.6-4 6.5-4s5.1 1.2 6.5 4"/></svg>

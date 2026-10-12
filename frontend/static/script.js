@@ -6,6 +6,31 @@ document.addEventListener("submit", (event) => {
 });
 
 document.addEventListener("click", (event) => {
+  const point = event.target.closest("[data-month-point]");
+  const points = document.querySelectorAll("[data-month-point]");
+  if (point) {
+    const wasActive = point.classList.contains("is-active");
+    points.forEach((item) => item.classList.remove("is-active"));
+    if (!wasActive) {
+      point.classList.add("is-active");
+    } else {
+      point.blur();
+    }
+    return;
+  }
+  points.forEach((item) => item.classList.remove("is-active"));
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    document.querySelectorAll("[data-month-point].is-active").forEach((point) => {
+      point.classList.remove("is-active");
+      point.blur();
+    });
+  }
+});
+
+document.addEventListener("click", (event) => {
   const toggle = event.target.closest("[data-password-toggle]");
   if (!toggle) return;
 
@@ -513,23 +538,6 @@ if (analyticsFilters) {
   const monthSelect = analyticsFilters.querySelector('[name="month"]');
   const daySelect = analyticsFilters.querySelector('[name="day"]');
 
-  const datePeriod = new URLSearchParams(window.location.search).get("date_period");
-  const dateValue = new URLSearchParams(window.location.search).get("date");
-  if (datePeriod) {
-    const periodInput = document.createElement("input");
-    periodInput.type = "hidden";
-    periodInput.name = "date_period";
-    periodInput.value = datePeriod;
-    analyticsFilters.append(periodInput);
-  }
-  if (dateValue) {
-    const dateInput = document.createElement("input");
-    dateInput.type = "hidden";
-    dateInput.name = "date";
-    dateInput.value = dateValue;
-    analyticsFilters.append(dateInput);
-  }
-
   const syncMonthOptions = () => {
     const selectedYear = Number(yearSelect.value || currentYear);
     const maxMonth = selectedYear === currentYear ? currentMonth : 12;
@@ -548,11 +556,15 @@ if (analyticsFilters) {
   const updateDays = (preserveSelection) => {
     const previousDay = preserveSelection ? daySelect.value : "";
     const dayCount = new Date(Number(yearSelect.value), Number(monthSelect.value), 0).getDate();
+    const maxDay = Number(yearSelect.value) === currentYear
+      && Number(monthSelect.value) === currentMonth
+      ? Math.min(dayCount, today.getDate())
+      : dayCount;
     daySelect.replaceChildren(new Option("All days", ""));
-    for (let day = 1; day <= dayCount; day += 1) {
+    for (let day = 1; day <= maxDay; day += 1) {
       daySelect.add(new Option(String(day), String(day)));
     }
-    if (Number(previousDay) <= dayCount) daySelect.value = previousDay;
+    if (Number(previousDay) <= maxDay) daySelect.value = previousDay;
   };
 
   yearSelect.addEventListener("change", () => {
@@ -620,6 +632,7 @@ window.addEventListener("scroll", closeExpenseMenus, true);
 const budgetModal = document.querySelector("[data-budget-modal]");
 if (budgetModal) {
   const amountInput = budgetModal.querySelector("#dashboard-budget-amount");
+  const monthSelect = budgetModal.querySelector("[data-budget-month]");
   const openBudgetModal = () => {
     if (!budgetModal.open) budgetModal.showModal();
     amountInput.focus();
@@ -628,6 +641,10 @@ if (budgetModal) {
     button.addEventListener("click", openBudgetModal);
   });
   budgetModal.querySelector("[data-close-budget-modal]").addEventListener("click", () => budgetModal.close());
+  monthSelect.addEventListener("change", () => {
+    amountInput.value = monthSelect.selectedOptions[0].dataset.budgetAmount || "";
+    amountInput.setCustomValidity("");
+  });
   budgetModal.querySelector("[data-budget-form]").addEventListener("submit", (event) => {
     if (!amountInput.value) {
       amountInput.setCustomValidity("Enter a budget amount.");
@@ -664,4 +681,107 @@ if (swipeTrack) {
     });
   });
   markActiveDot();
+}
+
+const aiDialog = document.querySelector("[data-ai-dialog]");
+if (aiDialog) {
+  const openButton = document.querySelector("[data-ai-open]");
+  const closeButton = aiDialog.querySelector("[data-ai-close]");
+  const messages = aiDialog.querySelector("[data-ai-messages]");
+  const status = aiDialog.querySelector("[data-ai-status]");
+  const form = aiDialog.querySelector("[data-ai-form]");
+  const input = form.querySelector('[name="message"]');
+  const submitButton = form.querySelector("[data-ai-submit]");
+  const historyKey = `spendwise-ai-${aiDialog.dataset.userId}-${aiDialog.dataset.csrfToken}`;
+  let history = [];
+
+  const renderMessage = (role, content) => {
+    const message = document.createElement("article");
+    message.className = `ai-message ai-message-${role}`;
+    message.setAttribute("aria-label", role === "user" ? "Your message" : "SpendWise AI response");
+    const text = document.createElement("p");
+    text.textContent = content;
+    message.append(text);
+    messages.append(message);
+  };
+
+  try {
+    const savedHistory = sessionStorage.getItem(historyKey);
+    const parsedHistory = savedHistory ? JSON.parse(savedHistory) : [];
+    if (
+      Array.isArray(parsedHistory)
+      && parsedHistory.every((item) => (
+        item
+        && (item.role === "user" || item.role === "assistant")
+        && typeof item.content === "string"
+      ))
+    ) {
+      history = parsedHistory;
+      history.forEach((item) => renderMessage(item.role, item.content));
+      messages.scrollTop = messages.scrollHeight;
+    }
+  } catch (error) {
+    status.textContent = "Your previous chat history could not be loaded.";
+  }
+
+  openButton.addEventListener("click", () => {
+    aiDialog.showModal();
+    input.focus();
+  });
+  closeButton.addEventListener("click", () => aiDialog.close());
+  aiDialog.addEventListener("click", (event) => {
+    if (event.target === aiDialog) aiDialog.close();
+  });
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const message = input.value.trim();
+    if (!message || submitButton.disabled) return;
+
+    history.push({ role: "user", content: message });
+    renderMessage("user", message);
+    input.value = "";
+    status.textContent = "SpendWise AI is preparing your answer…";
+    submitButton.disabled = true;
+    input.disabled = true;
+    try {
+      const response = await fetch(aiDialog.dataset.apiUrl, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": aiDialog.dataset.csrfToken,
+        },
+        body: JSON.stringify({ message }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "SpendWise AI could not respond.");
+
+      history.push({ role: "assistant", content: result.response });
+      renderMessage("assistant", result.response);
+      status.textContent = "";
+      try {
+        sessionStorage.setItem(historyKey, JSON.stringify(history));
+      } catch (error) {
+        status.textContent = "This conversation will not be saved for this browser session.";
+      }
+      messages.scrollTop = messages.scrollHeight;
+    } catch (error) {
+      status.textContent = error instanceof Error
+        ? error.message
+        : "SpendWise AI could not respond right now. Please try again.";
+    } finally {
+      submitButton.disabled = false;
+      input.disabled = false;
+      input.focus();
+    }
+  });
+  document.querySelectorAll('form[action="/logout"]').forEach((logoutForm) => {
+    logoutForm.addEventListener("submit", () => {
+      try {
+        sessionStorage.removeItem(historyKey);
+      } catch (error) {
+        status.textContent = "Chat history could not be cleared from this browser session.";
+      }
+    });
+  });
 }

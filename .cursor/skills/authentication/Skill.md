@@ -28,6 +28,14 @@ Align behavior with [docs/requirements.md](../../docs/requirements.md) and
 - Each authenticated user can access only their own expenses, categories, and budgets.
 - Invalid or expired user sessions must be cleared and the user must be redirected to the Login page.
 
+## Phase 1 AI Assistant
+
+The assistant is available only to an authenticated user and must use that
+user's records exclusively. Apply the existing session and ownership checks to
+all assistant data retrieval; never include another user's financial data in
+the response context. Phase 1 is read-only; see
+[docs/requirements.md](../../../docs/requirements.md) for the feature scope.
+
 ## Scope
 
 The account identifier is username, not email. Expense data consists of amount,

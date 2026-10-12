@@ -5,7 +5,7 @@ import re
 import secrets
 import sqlite3
 from datetime import date
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_CEILING
 from functools import wraps
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -13,6 +13,8 @@ from urllib.parse import urlsplit
 from flask import Flask, abort, flash, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from backend.routes.chat import chat_blueprint
+from backend.services.config import get_missing_ai_configuration
 from database.database import (
     USER_ROLES,
     DEFAULT_CATEGORIES_BY_ROLE,
@@ -67,6 +69,14 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
 )
+app.register_blueprint(chat_blueprint)
+app.logger.warning("AI Provider = Groq SDK")
+missing_ai_configuration = get_missing_ai_configuration()
+if missing_ai_configuration:
+    app.logger.warning(
+        "SpendWise AI is disabled; configure required environment variable(s): %s",
+        ", ".join(missing_ai_configuration),
+    )
 
 def csrf_token():
     token = session.get("csrf_token")
@@ -119,10 +129,18 @@ def template_helpers():
 @app.before_request
 def protect_form_submissions():
     if request.method == "POST":
-        submitted_token = request.form.get("csrf_token", "")
+        if request.path == "/api/chat" and session.get("user_id") is None:
+            return None
+        submitted_token = (
+            request.headers.get("X-CSRF-Token", "")
+            if request.is_json
+            else request.form.get("csrf_token", "")
+        )
         saved_token = session.get("csrf_token", "")
         if not saved_token or not hmac.compare_digest(submitted_token, saved_token):
             if request.is_json:
+                if request.path == "/api/chat":
+                    return jsonify(error="Your session expired. Sign in again."), 400
                 abort(400)
             session.clear()
             flash("Your session expired. Please sign in again.", "error")
@@ -416,7 +434,206 @@ def add_subcategory(category_id):
     return jsonify(id=subcategory["id"], name=subcategory["name"])
 
 
-# Analytics functionality removed per user request
+def parse_month_period(period):
+    try:
+        year, month = (int(part) for part in (period or "").split("-"))
+        selected = date(year, month, 1)
+    except (ValueError, TypeError):
+        selected = date.today().replace(day=1)
+    return selected.strftime("%Y-%m")
+
+
+def get_period_analytics(user_id, year, month, day=None, category_id=None, start_date=None, end_date=None):
+    period_start = start_date or date(year, month, day or 1)
+    period_end = end_date or (
+        date.fromordinal(period_start.toordinal() + 1)
+        if day
+        else date(year + (month == 12), 1 if month == 12 else month + 1, 1)
+    )
+    conditions = ["e.user_id = ?", "e.expense_date >= ?", "e.expense_date < ?"]
+    parameters = [user_id, period_start.isoformat(), period_end.isoformat()]
+    if category_id is not None:
+        conditions.append("e.category_id = ?")
+        parameters.append(category_id)
+
+    with database_connection() as connection:
+        rows = connection.execute(
+            "SELECT COALESCE(c.name, e.category) AS category, e.amount "
+            "FROM expenses e LEFT JOIN categories c "
+            "ON c.id = e.category_id AND c.user_id = e.user_id "
+            f"WHERE {' AND '.join(conditions)}",
+            parameters,
+        ).fetchall()
+
+    category_totals = {}
+    total = Decimal("0")
+    for row in rows:
+        amount = Decimal(row["amount"])
+        category_totals[row["category"]] = category_totals.get(row["category"], Decimal("0")) + amount
+        total += amount
+
+    palette = ["#159447", "#f47b20", "#f0a000", "#2167d5", "#009b8a", "#d95643", "#7956a8"]
+    items = []
+    stops = []
+    position = Decimal("0")
+    for index, (category, category_total) in enumerate(
+        sorted(category_totals.items(), key=lambda item: (-item[1], item[0].casefold()))
+    ):
+        percentage = category_total / total * Decimal("100") if total else Decimal("0")
+        next_position = position + percentage
+        color = palette[index % len(palette)]
+        items.append({
+            "category": category,
+            "total": category_total,
+            "percentage": percentage,
+            "color": color,
+        })
+        stops.append(f"{color} {position:.2f}% {next_position:.2f}%")
+        position = next_position
+
+    return {
+        "items": items,
+        "total": total,
+        "count": len(rows),
+        "average": total / len(rows) if rows else Decimal("0"),
+        "highest_category": items[0] if items else None,
+        "chart_background": "conic-gradient(" + ", ".join(stops) + ")" if stops else "",
+    }
+
+
+def resolve_expense_date_filter(period, selected_date, today):
+    period = period or ("custom" if selected_date else "today")
+    if period == "today":
+        return period, today, date.fromordinal(today.toordinal() + 1), today.isoformat(), None
+    if period == "yesterday":
+        yesterday = date.fromordinal(today.toordinal() - 1)
+        return period, yesterday, today, "", None
+    if period == "last7":
+        start_date = date.fromordinal(today.toordinal() - 6)
+        return period, start_date, date.fromordinal(today.toordinal() + 1), "", None
+    if period == "custom":
+        try:
+            parsed_date = date.fromisoformat(selected_date)
+            if parsed_date.isoformat() != selected_date or parsed_date > today:
+                raise ValueError
+        except ValueError:
+            return "today", today, date.fromordinal(today.toordinal() + 1), today.isoformat(), (
+                "Choose a valid date no later than today."
+            )
+        return period, parsed_date, date.fromordinal(parsed_date.toordinal() + 1), selected_date, None
+    return "today", today, date.fromordinal(today.toordinal() + 1), today.isoformat(), (
+        "Choose a valid date filter."
+    )
+
+
+def get_annual_spending_chart(user_id, year, today, category_id=None):
+    month_numbers = list(range(1, today.month + 1)) if year == today.year else list(range(1, 13))
+    first_month = f"{year:04d}-01-01"
+    end_date = date(year + (len(month_numbers) == 12), 1 if len(month_numbers) == 12 else len(month_numbers) + 1, 1)
+    conditions = ["user_id = ?", "expense_date >= ?", "expense_date < ?"]
+    parameters = [user_id, first_month, end_date.isoformat()]
+    if category_id is not None:
+        conditions.append("category_id = ?")
+        parameters.append(category_id)
+
+    with database_connection() as connection:
+        expense_rows = connection.execute(
+            "SELECT CAST(substr(expense_date, 6, 2) AS INTEGER) AS month, amount "
+            f"FROM expenses WHERE {' AND '.join(conditions)}",
+            parameters,
+        ).fetchall()
+        budget_rows = connection.execute(
+            "SELECT year, month, budget_amount FROM budgets "
+            "WHERE user_id = ? AND (year < ? OR (year = ? AND month <= ?)) "
+            "ORDER BY year, month",
+            (user_id, year, year, month_numbers[-1]),
+        ).fetchall()
+
+    spending_by_month = {}
+    for row in expense_rows:
+        month_total = spending_by_month.get(row["month"], Decimal("0")) + Decimal(row["amount"])
+        spending_by_month[row["month"]] = month_total
+    budget_changes = {
+        (row["year"], row["month"]): Decimal(row["budget_amount"])
+        for row in budget_rows
+    }
+    active_budget = None
+    for row in budget_rows:
+        if row["year"] >= year:
+            break
+        active_budget = Decimal(row["budget_amount"])
+    budgets_by_month = {}
+    for month in month_numbers:
+        active_budget = budget_changes.get((year, month), active_budget)
+        budgets_by_month[month] = active_budget
+    values = list(spending_by_month.values()) + [
+        budget for budget in budgets_by_month.values() if budget is not None
+    ]
+    maximum = max(values, default=Decimal("0"))
+    tick_step = (
+        (maximum / Decimal("4")).quantize(Decimal("1000"), rounding=ROUND_CEILING)
+        if maximum
+        else Decimal("1000")
+    )
+    if tick_step == 0:
+        tick_step = Decimal("1000")
+    chart_maximum = tick_step * 4
+    chart_bottom = Decimal("230")
+    chart_height = Decimal("200")
+
+    def chart_y(value):
+        return float(chart_bottom - value / chart_maximum * chart_height)
+
+    chart_points = []
+    for index, month in enumerate(month_numbers):
+        x = index * 1000 / max(1, len(month_numbers) - 1) if len(month_numbers) > 1 else 500
+        spent = spending_by_month.get(month, Decimal("0"))
+        budget = budgets_by_month.get(month)
+        status = "over" if budget is not None and spent > budget else (
+            "under" if budget is not None else "not-set"
+        )
+        chart_points.append({
+            "month": month,
+            "label": calendar.month_abbr[month],
+            "spending": spent,
+            "budget": budget,
+            "remaining": budget - spent if budget is not None else None,
+            "status": status,
+            "x": x,
+            "x_percent": x / 10,
+            "spending_y": chart_y(spent),
+            "budget_y": chart_y(budget) if budget is not None else None,
+        })
+
+    spending_path = " ".join(
+        ("M" if index == 0 else "L") + f" {point['x']:.1f} {point['spending_y']:.1f}"
+        for index, point in enumerate(chart_points)
+    )
+    budget_segments = []
+    previous_budget_point = None
+    for point in chart_points:
+        if point["budget"] is None:
+            continue
+        if previous_budget_point is None:
+            budget_segments.append(f"M {point['x']:.1f} {point['budget_y']:.1f}")
+        else:
+            budget_segments.append(f"H {point['x']:.1f} V {point['budget_y']:.1f}")
+        previous_budget_point = point
+
+    ticks = [
+        {
+            "value": tick_step * index,
+            "y": float(chart_bottom - Decimal(index) / Decimal("4") * chart_height),
+        }
+        for index in range(5)
+    ]
+    return {
+        "months": chart_points,
+        "ticks": ticks,
+        "spending_path": spending_path,
+        "budget_path": " ".join(budget_segments),
+        "year": year,
+    }
 
 
 def get_budget_summary(user_id, month=None, year=None):
@@ -749,6 +966,13 @@ def dashboard():
             "FROM expenses WHERE user_id = ? ORDER BY year DESC",
             (session["user_id"],),
         ).fetchall()
+        budget_rows = connection.execute(
+            "SELECT month, budget_amount FROM budgets WHERE user_id = ? AND year = ?",
+            (session["user_id"], today.year),
+        ).fetchall()
+    budget_amounts_by_month = {
+        int(row["month"]): row["budget_amount"] for row in budget_rows
+    }
     year_options = sorted(
         {today.year, *(int(row["year"]) for row in expense_years)},
         reverse=True,
@@ -836,6 +1060,7 @@ def dashboard():
         range_end=range_end,
         period=budget_period,
         period_label=date(today.year, today.month, 1).strftime("%B %Y"),
+        budget_amounts_by_month=budget_amounts_by_month,
         today=today.isoformat(),
         selected_month=selected_month,
         selected_year=selected_year,
@@ -854,6 +1079,7 @@ def dashboard():
         matching_expense_count=matching_expense_count,
         open_budget_modal=False if expense_fragment else session.pop("open_budget_modal", False),
         budget_amount_input=None if expense_fragment else session.pop("budget_amount_input", None),
+        budget_month_input=None if expense_fragment else session.pop("budget_month_input", None),
     )
 
 
@@ -936,9 +1162,7 @@ def analytics_page():
             "last7": "Last 7 Days",
             "custom": date_filter,
         }[date_period]
-    analytics_period = (
-        date.fromordinal(date_range[1].toordinal() - 1) if date_range else today
-    )
+    analytics_period = date.fromordinal(date_range[1].toordinal() - 1) if date_range else today
     try:
         selected_year = int(request.args.get("year", analytics_period.year))
         selected_month = int(request.args.get("month", analytics_period.month))
@@ -974,38 +1198,13 @@ def analytics_page():
         session["user_id"],
         selected_year,
         selected_month,
-        selected_day if date_range is None else None,
+        selected_day,
         selected_category_id,
         start_date=date_range[0] if date_range else None,
         end_date=date_range[1] if date_range else None,
     )
-
-    comparison_month_value = request.args.get("comparison_month", "").strip()
-    if comparison_month_value:
-        try:
-            if not re.fullmatch(r"\d{4}-\d{2}", comparison_month_value):
-                raise ValueError
-            comparison_year, comparison_month = map(int, comparison_month_value.split("-"))
-            date(comparison_year, comparison_month, 1)
-            if comparison_year > today.year or (
-                comparison_year == today.year and comparison_month > today.month
-            ):
-                raise ValueError
-        except (ValueError, TypeError):
-            flash("Choose a valid comparison month up to the current month.", "error")
-            comparison_year, comparison_month = selected_year, selected_month
-    else:
-        comparison_year, comparison_month = selected_year, selected_month
-
-    previous_month = comparison_month - 1 or 12
-    previous_year = comparison_year - 1 if comparison_month == 1 else comparison_year
-    comparison_budget = get_budget_summary(session["user_id"], comparison_month, comparison_year)
-    previous_budget = get_budget_summary(session["user_id"], previous_month, previous_year)
-    comparison_analytics = get_period_analytics(
-        session["user_id"], comparison_year, comparison_month, category_id=selected_category_id
-    )
-    previous_comparison = get_period_analytics(
-        session["user_id"], previous_year, previous_month, category_id=selected_category_id
+    annual_chart = get_annual_spending_chart(
+        session["user_id"], selected_year, today, selected_category_id
     )
     with database_connection() as connection:
         years = connection.execute(
@@ -1013,7 +1212,10 @@ def analytics_page():
             "FROM expenses WHERE user_id = ? ORDER BY year DESC",
             (session["user_id"],),
         ).fetchall()
-    year_options = sorted({year for year in [today.year, selected_year, *(row["year"] for row in years)] if year <= today.year}, reverse=True)
+    year_options = sorted({
+        year for year in [today.year, selected_year, *(row["year"] for row in years)]
+        if year <= today.year
+    }, reverse=True)
 
     return render_template(
         "analytics.html",
@@ -1022,21 +1224,22 @@ def analytics_page():
         selected_year=selected_year,
         selected_month=selected_month,
         selected_day=selected_day,
-        comparison_year=comparison_year,
-        comparison_month=comparison_month,
-        comparison_month_value=f"{comparison_year:04d}-{comparison_month:02d}",
-        current_month_value=f"{today.year:04d}-{today.month:02d}",
-        year_options=year_options,
-        analytics=analytics,
-        comparison_analytics=comparison_analytics,
-        previous_comparison=previous_comparison,
-        comparison_budget=comparison_budget,
-        previous_budget=previous_budget,
-        previous_month=previous_month,
-        previous_year=previous_year,
+        date_label=date_label,
         date_period=date_period,
         date_filter=date_filter,
-        date_label=date_label,
+        month_names=calendar.month_name,
+        month_options=range(1, 13),
+        day_options=range(
+            1,
+            min(
+                calendar.monthrange(selected_year, selected_month)[1],
+                today.day if (selected_year, selected_month) == (today.year, today.month) else 31,
+            ) + 1,
+        ),
+        year_options=year_options,
+        analytics=analytics,
+        annual_chart=annual_chart,
+        today=today,
     )
 
 
@@ -1080,6 +1283,7 @@ def save_budget():
         if request.form.get("return_to", "").strip() == "dashboard":
             session["open_budget_modal"] = True
             session["budget_amount_input"] = request.form.get("budget_amount", "")
+            session["budget_month_input"] = request.form.get("month", "")
             return redirect(url_for("dashboard"))
         return redirect(url_for("budget_page"))
 
@@ -1250,4 +1454,4 @@ initialize_database()
 
 
 if __name__ == "__main__":
-    app.run(debug=os.environ.get("FLASK_DEBUG") == "1")
+    app.run(debug=os.environ.get("FLASK_DEBUG") == "1", use_reloader=True)

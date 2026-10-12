@@ -62,3 +62,12 @@ A successful Version 2 implementation should show that:
 - users can understand their spending patterns in under a short review cycle
 
 The Version 2 goals extend the original application toward practical personal finance support while preserving the simple and beginner-friendly experience of the existing Expense Tracker.
+
+## Phase 1: AI Assistant Integration
+
+Users should be able to ask natural-language questions about their recorded
+spending and budgets and receive useful, contextual financial insights without
+manually reviewing every list, table, or chart. The Phase 1 assistant makes
+SpendWise's existing information easier to understand and act on while
+remaining informational and read-only. Its detailed scope is defined in
+[requirements.md](requirements.md).

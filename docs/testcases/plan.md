@@ -272,10 +272,11 @@ product behavior beyond those documents.
 
 - TS-47: Day and Category Filter Validation
   - Verify selected day filters summary data.
-  - Verify comparison metrics remain month-based.
-  - Verify category filtering applies consistently across comparisons.
+  - Verify selected day does not narrow annual chart monthly totals.
+  - Verify category filtering applies to the distribution and annual spending.
 
-- TS-48: Comparison and Empty State Validation
-  - Verify month boundary comparisons.
-  - Verify year boundary comparisons.
+- TS-48: Yearly Chart and Empty State Validation
+  - Verify the current-year chart ends at the current month.
+  - Verify a past-year chart includes all twelve months.
+  - Verify budget and spending details appear on hover, focus, and touch tap.
   - Verify empty-data states are displayed correctly.

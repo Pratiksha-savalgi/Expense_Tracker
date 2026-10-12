@@ -19,9 +19,20 @@ Use the screenshots in the /design/visuals folder as the source of truth for UI 
   description, and a preview of matching existing expenses and analytics.
 - **Edit Expense:** amount, category, date, optional description.
 - **Analytics:** year, month, day, and category filters; period summary,
-  category distribution, empty state, and previous-month comparison.
+  category distribution, empty state, and yearly spending-versus-budget chart
+  with hover/focus or touch chart-point details.
 
 There are no subcategory or expense-type controls or displays.
+
+## Phase 1 AI Assistant
+
+The assistant chat interface supports the five read-only intents
+defined in [docs/requirements.md](../../../docs/requirements.md): Total Spending,
+Category Spending, Top Expenses, Budget Status, and Month Comparison. Keep
+questions and responses conversational, show history for the current session,
+and do not add UI actions that create, update, or delete expenses or budgets.
+Responses must use only authenticated-user data; preserve all existing
+SpendWise pages and interactions.
 
 ## Add Expense date-filter component
 

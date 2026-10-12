@@ -7,6 +7,7 @@
 {{ format_money(value)[:-3] if format_money(value).endswith('.00') else format_money(value) }}
 {%- endmacro %}
 {% set utilization_width = [budget.utilization, 100]|min %}
+{% set selected_budget_month = budget_month_input|int if budget_month_input is not none and 1 <= budget_month_input|int <= 12 else budget.month %}
 <div class="dashboard-page">
   <section class="dashboard-heading">
     <div>
@@ -95,7 +96,7 @@
 <dialog class="budget-modal" data-budget-modal data-auto-open="{{ 'true' if open_budget_modal else 'false' }}" aria-labelledby="budget-modal-title">
   <form method="post" action="{{ url_for('save_budget') }}" data-budget-form>
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="period" value="{{ '%04d-%02d'|format(budget.year, budget.month) }}">
+    <input type="hidden" name="year" value="{{ budget.year }}">
     <input type="hidden" name="return_to" value="dashboard">
     <div class="budget-modal-header">
       <div>
@@ -104,6 +105,16 @@
       </div>
       <button class="expense-modal-close" type="button" data-close-budget-modal aria-label="Close edit budget">×</button>
     </div>
+    <label for="dashboard-budget-month">Month</label>
+    <select id="dashboard-budget-month" name="month" data-budget-month>
+      {% for month_number in range(1, 13) %}
+      <option value="{{ month_number }}"
+              data-budget-amount="{{ budget_amounts_by_month.get(month_number, '') }}"
+              {% if month_number == selected_budget_month %}selected{% endif %}>
+        {{ month_names[month_number - 1] }}
+      </option>
+      {% endfor %}
+    </select>
     <label for="dashboard-budget-amount">Budget amount</label>
     <div class="amount-input">
       <span aria-hidden="true">₹</span>

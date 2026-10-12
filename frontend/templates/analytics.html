@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Analytics{% endblock %}
+{% block body_class %}analytics-layout{% endblock %}
+{% block main_class %}analytics-page{% endblock %}
+{% block content %}
+{% macro analytics_money(value) -%}
+{{ format_money(value)[:-3] if format_money(value).endswith('.00') else format_money(value) }}
+{%- endmacro %}
+{% set has_annual_data = namespace(value=false) %}
+{% for point in annual_chart.months %}
+  {% if point.spending or point.budget is not none %}{% set has_annual_data.value = true %}{% endif %}
+{% endfor %}
+<section class="analytics-heading">
+  <div>
+    <h1>Analytics</h1>
+    <p class="page-lede">Spending insights by period and category.</p>
+  </div>
+</section>
+
+<form class="analytics-filters" method="get" action="{{ url_for('analytics_page') }}" aria-label="Analytics filters">
+  {% if date_period %}<input type="hidden" name="date_period" value="{{ date_period }}">{% endif %}
+  {% if date_filter %}<input type="hidden" name="date" value="{{ date_filter }}">{% endif %}
+  <div class="filter-field">
+    <label for="analytics-year">Year</label>
+    <select id="analytics-year" name="year">
+      {% for year_value in year_options %}
+      <option value="{{ year_value }}" {% if year_value == selected_year %}selected{% endif %}>{{ year_value }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-field">
+    <label for="analytics-month">Month</label>
+    <select id="analytics-month" name="month">
+      {% for month_number in month_options %}
+      <option value="{{ month_number }}" {% if month_number == selected_month %}selected{% endif %} {% if selected_year == today.year and month_number > today.month %}disabled{% endif %}>{{ month_names[month_number] }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-field">
+    <label for="analytics-day">Day</label>
+    <select id="analytics-day" name="day">
+      <option value="">All days</option>
+      {% for day_number in day_options %}
+      <option value="{{ day_number }}" {% if day_number == selected_day %}selected{% endif %}>{{ day_number }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-field">
+    <label for="analytics-category">Category</label>
+    <select id="analytics-category" name="category">
+      <option value="">All categories</option>
+      {% for category in categories %}
+      <option value="{{ category.id }}" {% if category.id|string == category_filter %}selected{% endif %}>{{ category.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="analytics-filter-actions">
+    <button class="button button-outline" type="submit">Apply</button>
+    <a class="button button-quiet" href="{{ url_for('analytics_page') }}" aria-label="Reset analytics filters" title="Reset filters">Reset</a>
+  </div>
+</form>
+
+<section class="analytics-panel" aria-labelledby="distribution-title">
+  <div class="records-heading">
+    <div>
+      <h2 id="distribution-title">Category-wise distribution</h2>
+      <p class="page-lede">
+        {% if date_label %}{{ date_label }}{% else %}{{ month_names[selected_month] }} {{ selected_year }}{% if selected_day %} · day {{ selected_day }}{% endif %}{% endif %}
+        {% if category_filter %} · {{ analytics.highest_category.category if analytics.highest_category else 'Selected category' }}{% else %} · all categories{% endif %}
+      </p>
+    </div>
+    {% if analytics.highest_category %}
+    <p class="analytics-highest">Highest: <strong>{{ analytics.highest_category.category }}</strong></p>
+    {% endif %}
+  </div>
+  {% if analytics['items'] %}
+  <div class="distribution-layout">
+    <div class="category-donut" role="img" aria-label="Category spending distribution for {{ month_names[selected_month] }} {{ selected_year }}" style="background: {{ analytics.chart_background }}">
+      <div class="category-donut-center">
+        <span>Total</span>
+        <strong>{{ analytics_money(analytics.total) }}</strong>
+      </div>
+    </div>
+    <div class="category-legend">
+      {% for item in analytics['items'] %}
+      <div class="legend-row">
+        <span class="legend-name"><i style="--category-color: {{ item.color }}"></i>{{ item.category }}</span>
+        <span class="legend-percent">{{ '%.1f'|format(item.percentage) }}%</span>
+        <strong>{{ analytics_money(item.total) }}</strong>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <span class="empty-mark" aria-hidden="true">%</span>
+    <h3>No category data for this period</h3>
+    <p>Add expenses for {{ month_names[selected_month] }} {{ selected_year }} to see the spending distribution.</p>
+  </div>
+  {% endif %}
+</section>
+
+<section class="analytics-panel annual-spending-panel" aria-labelledby="annual-spending-title">
+  <div class="records-heading">
+    <div>
+      <h2 id="annual-spending-title">Monthly spending vs budget</h2>
+      <p class="page-lede">
+        Monthly budget compared with amount spent · {{ selected_year }}
+        {% if category_filter %} · {{ analytics.highest_category.category if analytics.highest_category else 'selected category' }}{% endif %}
+      </p>
+    </div>
+  </div>
+  <div class="annual-chart-legend" aria-label="Chart legend">
+    <span><i class="chart-legend-budget"></i>Monthly Budget</span>
+    <span><i class="chart-legend-spending"></i>Amount Spent</span>
+    <span><i class="chart-legend-under"></i>Under budget</span>
+    <span><i class="chart-legend-over"></i>Over budget</span>
+    <span class="annual-chart-unit">Amount (₹)</span>
+  </div>
+  {% if has_annual_data.value %}
+  <div class="annual-chart" role="group" aria-label="Monthly spending and budget for {{ selected_year }}. Select or hover over a month to view details.">
+    <div class="annual-chart-y-labels" aria-hidden="true">
+      {% for tick in annual_chart.ticks %}
+      <span style="top: {{ tick.y / 2.5 }}%">{% if tick.value >= 1000 %}₹{{ (tick.value / 1000)|int }}k{% else %}{{ analytics_money(tick.value) }}{% endif %}</span>
+      {% endfor %}
+    </div>
+    <div class="annual-chart-plot">
+      <svg viewBox="0 0 1000 250" preserveAspectRatio="none" aria-hidden="true">
+        {% for tick in annual_chart.ticks %}
+        <line class="annual-chart-gridline" x1="0" y1="{{ tick.y }}" x2="1000" y2="{{ tick.y }}"></line>
+        {% endfor %}
+        <path class="annual-spending-line" d="{{ annual_chart.spending_path }}"></path>
+        {% if annual_chart.budget_path %}
+        <path class="annual-budget-line" d="{{ annual_chart.budget_path }}"></path>
+        {% endif %}
+      </svg>
+      {% for point in annual_chart.months %}
+      <button
+        class="annual-chart-point point-{{ point.status }}{% if point.spending_y < 145 %} tooltip-below{% endif %}{% if loop.first %} point-edge-start{% elif loop.last %} point-edge-end{% endif %}"
+        style="left: {{ point.x_percent }}%; top: {{ point.spending_y / 2.5 }}%"
+        type="button"
+        data-month-point
+        aria-label="{{ point.label }} {{ selected_year }}: spent {{ analytics_money(point.spending) }}{% if point.budget is not none %}, budget {{ analytics_money(point.budget) }}, {{ 'over budget' if point.status == 'over' else 'under budget' }}{% else %}, no budget set{% endif %}"
+      >
+        <span class="annual-chart-tooltip" role="status">
+          <strong>{{ point.label }} {{ selected_year }}</strong>
+          <span><span>Budget</span><b>{% if point.budget is not none %}{{ analytics_money(point.budget) }}{% else %}Not set{% endif %}</b></span>
+          <span><span>Spent</span><b>{{ analytics_money(point.spending) }}</b></span>
+          <span><span>{% if point.remaining is not none and point.remaining < 0 %}Over budget{% else %}Remaining{% endif %}</span><b class="{% if point.status == 'over' %}chart-value-over{% elif point.status == 'under' %}chart-value-under{% endif %}">{% if point.remaining is not none %}{{ analytics_money(point.remaining|abs) if point.remaining < 0 else analytics_money(point.remaining) }}{% else %}Not set{% endif %}</b></span>
+          <span><span>Status</span><b class="chart-status chart-status-{{ point.status }}">{% if point.status == 'over' %}Over budget{% elif point.status == 'under' %}Under budget{% else %}No budget set{% endif %}</b></span>
+        </span>
+      </button>
+      {% endfor %}
+    </div>
+    <div class="annual-chart-months" aria-hidden="true">
+      {% for point in annual_chart.months %}<span>{{ point.label }}</span>{% endfor %}
+    </div>
+  </div>
+  <p class="annual-chart-help">Hover over a month or focus it to see budget details. On a touch screen, tap a month.</p>
+  {% else %}
+  <div class="empty-state">
+    <span class="empty-mark" aria-hidden="true">₹</span>
+    <h3>No spending or budgets for {{ selected_year }}</h3>
+    <p>Monthly spending and budget details will appear here when you add activity.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

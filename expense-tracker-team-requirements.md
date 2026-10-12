@@ -72,9 +72,12 @@ specifications.
 - Reject selected days that are invalid or later than today.
 - Show selected-period totals, count, average, highest category, category
   amounts, and contribution percentages.
-- Compare full-month spending and budget utilization with the previous calendar
-  month. Apply category filter to both months; day narrows the selected-period
-  summary only.
+- Show monthly spending against each month's budget for the selected year.
+  Include January through the current month for the current year, or all twelve
+  months for a past year. The category filter applies to yearly spending; day
+  narrows the selected-period summary and category distribution only.
+- Reveal each month's budget, spending, remaining amount, and under/over-budget
+  status on desktop hover/focus and touch-screen tap.
 - Show an empty state when no matching records exist.
 
 ## Integration and verification

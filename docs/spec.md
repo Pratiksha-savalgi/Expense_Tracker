@@ -116,14 +116,52 @@ API behavior, or database schema.
   month. The current year cannot select a later month.
 - `day`, when supplied, must be a valid day in that month and cannot be later
   than today.
+- An optional date period passed from Add Expense (`today`, `yesterday`,
+  `last7`, or `custom` with `date`) narrows the selected-period summary and
+  category distribution; it does not narrow the yearly chart's full-month
+  values.
 - Invalid period selections show feedback and fall back to the current month;
   an invalid day is cleared. An unowned category is cleared with feedback.
 - Year choices include the current year and years with the user's expenses,
   excluding future years.
 - The selected-period summary and category distribution honor day and category
-  filters. The month-over-month spending and utilization comparison uses full
-  calendar months; the category filter is consistently applied to both months.
+  filters. The yearly monthly-spending chart honors the selected year and
+  category filter, but each chart point represents a full calendar month and
+  does not use the selected day.
+- The yearly chart includes January through the current month for the current
+  year, and January through December for a past year. Monthly budget amounts are
+  plotted against monthly spending. Hovering or keyboard-focusing a desktop
+  month point, or tapping a touch-screen point, reveals its budget, spent,
+  remaining, and budget-status details.
 - Empty category data is rendered as an empty state, not as an error.
+
+## Phase 1 AI Assistant
+
+The Phase 1 assistant is a signed-in user's conversational, read-only way to
+ask about their own financial records. The detailed scope and security
+requirements are in [requirements.md](requirements.md).
+
+### User interactions
+
+- The user opens the assistant from its chat entry point, reads messages from
+  the current session, enters a natural-language question, and receives a
+  response in the conversation.
+- The conversation supports questions about total spending, spending by
+  category, top expenses, budget status, and comparisons between months.
+- When a question is unclear or the requested information is unavailable, the
+  assistant asks for clarification or explains that it cannot answer from the
+  available records.
+
+### Request and response behavior
+
+- A request is interpreted as one of the supported Phase 1 intents, with any
+  applicable time period, category, or result count.
+- The response summarizes the relevant signed-in user's records, uses
+  appropriate currency formatting, and explains calculations when useful.
+- Responses reflect stored data; missing information is not invented.
+- The assistant provides information only. It does not perform or imply a
+  change to expenses, budgets, profiles, or administrative data.
+- Existing SpendWise workflows and behavior remain unchanged.
 
 ## Persistence
 

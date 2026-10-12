@@ -166,9 +166,15 @@ today when creating an expense. Deletion requires browser confirmation.
 - Analytics can be filtered by year, month, day, and category.
 - Analytics show selected-period spending, expense count, average expense,
   category totals and percentages, and the highest-spending category.
-- Analytics compare full-month spending and budget utilization with the
-  previous calendar month. A category filter applies to both months; a selected
-  day narrows the selected-period summary, not the full-month comparison.
+- Analytics show a monthly spending-versus-budget chart for the selected year.
+  The chart includes January through the current month for the current year and
+  all twelve months for a past year. Each month's details, including budget,
+  spent amount, remaining amount, and under/over-budget status, appear on
+  hover/focus on desktop and on tap on touch screens.
+- The category filter applies to the selected-period summary, category
+  distribution, and yearly spending series. The day filter narrows the
+  selected-period summary and category distribution only; monthly chart values
+  remain full-month totals.
 - Analytics for a future year or a future month in the current year are not
   allowed. The latest selectable period is the current month of the current
   year.
@@ -281,7 +287,7 @@ today when creating an expense. Deletion requires browser confirmation.
 - Analytics display spending, expense count, average expense, category totals, and category percentages correctly.
 - Analytics display the highest-spending category for the selected period.
 - Year, Month, Day, and Category filters return accurate results.
-- Previous-month comparisons use the correct user-scoped data.
+- Monthly spending and budget chart values use the correct user-scoped data.
 - Future years, future months, and invalid dates are rejected.
 - Empty periods display a useful empty state.
  
@@ -308,3 +314,117 @@ today when creating an expense. Deletion requires browser confirmation.
 - Registration, Login, Dashboard, Expenses, Budget, and Analytics pages remain fully functional on mobile devices.
 - Responsive layouts match the approved UI designs in the design folder.
 - Core functionality remains accessible across supported screen sizes.
+
+## Phase 1: AI Assistant Integration
+
+### Overview and goal
+
+SpendWise will provide an AI-powered personal finance assistant for the
+authenticated user's own expense, budget, category, and analytics data. It is
+a SpendWise-focused assistant, not a general-purpose chatbot. Its goal is to
+answer natural-language questions with contextual financial summaries and
+insights, so users do not have to manually inspect lists, tables, and charts.
+
+### Phase 1 scope
+
+Phase 1 is read-only. The assistant may answer questions and provide financial
+summaries, but must not create, modify, or delete expenses or budgets; update
+profile information; or perform administrative actions.
+
+### AI provider
+
+- Use Groq as the only AI provider, with the default model
+  `llama-3.3-70b-versatile`.
+- Read `GROQ_API_KEY` and `GROQ_MODEL` from server-side environment
+  configuration; never expose the API key to frontend code or logs.
+- Validate both required settings at application startup, warn clearly when
+  either is missing, and disable AI requests gracefully until configured.
+- Keep the provider integration within the AI service layer so provider calls
+  do not change the assistant's SpendWise data-access and intent behavior.
+
+### User interface
+
+- Provide a floating assistant entry point, such as an “Ask SpendWise AI”
+  button.
+- Opening it displays a conversational chat interface with the current
+  session's chat history, a natural-language question input, and generated
+  responses.
+
+### Supported Phase 1 intents
+
+1. **Total spending:** Return total spending for the requested period. For
+   example, “How much did I spend this month?” should report the amount and
+   period, such as “You spent ₹5,200 during October 2026.”
+2. **Category spending:** Return the total for a requested category and
+   period. For example, “How much did I spend on Education?” should report
+   the category total for the current month.
+3. **Top expenses:** Return an ordered list of the highest expense transactions
+   for the requested period or count, such as “Show my top 5 expenses.”
+4. **Budget status:** Report the current budget, amount spent, remaining
+   budget, and utilization percentage when asked about budget status.
+5. **Month comparison:** Compare spending in two requested months and report
+   the difference, percentage increase or decrease, and relevant category
+   highlights.
+
+Example questions include:
+
+- How much did I spend this month?
+- How much have I spent on Education?
+- Which category has the highest spending?
+- What are my top expenses this month?
+- How much budget is remaining?
+- Did I exceed my budget?
+- Compare this month to last month.
+- What did I spend yesterday?
+- Show my highest expenses.
+
+### Data access and response rules
+
+- Require authentication and apply the existing authorization rules.
+- Read only records belonging to the signed-in user. Cross-user or shared
+  financial data must never be accessible or disclosed.
+- Responses must be clear, concise, financially informative, and easy to read.
+- Use currency formatting, refer to actual recorded data, and explain
+  calculations where appropriate.
+- Do not fabricate data, provide unsupported calculations, or give investment
+  advice. Do not make assumptions when data is unavailable; state that the
+  requested information is unavailable or ask for clarification as appropriate.
+
+### Recommended backend flow
+
+1. Receive the user's question.
+2. Identify the requested intent and any relevant period, category, or result
+   count.
+3. Query the database for only the signed-in user's data needed to answer it.
+4. Provide summarized, relevant context to the AI provider and generate a
+   contextual response.
+5. Return the response in the conversational interface.
+
+Do not send the entire database to the model. Database queries and
+user-ownership checks must happen before AI response generation; provide only
+the minimum summarized context needed for the answer.
+
+### Out of scope for Phase 1
+
+- Creating or modifying expenses through chat
+- Creating or modifying budgets through chat
+- Deleting expenses or budgets through chat
+- Voice assistant
+- Predictions or spending forecasts
+- Smart recommendations or automated financial coaching
+
+These capabilities may be considered in future phases and are not part of the
+Phase 1 implementation.
+
+### Phase 1 acceptance criteria
+
+- Users can open the assistant through a chat interface, ask natural-language
+  questions, see responses, and review chat history for the current session.
+- Answers are grounded in the authenticated user's records only and support
+  total spending, category spending, top expenses, budget status, and month
+  comparison intents.
+- The assistant is read-only and cannot change expenses, budgets, profiles, or
+  administrative data.
+- No existing SpendWise functionality or authorization behavior is changed.
+- Groq is the only provider used in Phase 1 and is configured with
+  `GROQ_API_KEY` and `GROQ_MODEL`; no API key is exposed or logged.

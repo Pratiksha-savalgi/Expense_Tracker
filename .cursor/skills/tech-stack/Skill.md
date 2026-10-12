@@ -34,6 +34,17 @@ Use only the technologies approved for this project unless the project documenta
 - For the current Version 2 scope, the existing stack is sufficient for monthly budget tracking and category analytics.
 - If a technology choice would affect architecture, security, or scope, pause and confirm with the project requirements before proceeding.
 
+## Phase 1 AI Assistant
+
+Phase 1 extends rather than replaces the approved stack with a Flask chat API
+and a dedicated Groq service layer. Use Groq's OpenAI-compatible
+chat-completions API and the `llama-3.3-70b-versatile` model by default,
+configured through server-side `GROQ_API_KEY` and `GROQ_MODEL` values. Keep
+the assistant read-only, base responses on authenticated-user data, and limit
+it to Total Spending, Category Spending, Top Expenses, Budget Status, and
+Month Comparison as defined in
+[docs/requirements.md](../../../docs/requirements.md).
+
 ## 5. Version 2 Stack Review
 
 The current stack remains sufficient for the Version 2 release. Monthly budget tracking and category analytics can be implemented using the existing Flask backend, SQLite data layer, and HTML/CSS/JavaScript frontend without changing the project’s core technology decisions.

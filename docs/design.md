@@ -14,6 +14,18 @@ Flask, SQLite, HTML, CSS, and lightweight JavaScript.
 
 The browser does not access SQLite directly.
 
+### Phase 1 AI Assistant
+
+The assistant extends this architecture as a read-only, authenticated feature:
+
+**User → Chat UI → Backend Chat Endpoint → User-scoped Data Retrieval →
+Provider-independent AI Service / Model → Response**
+
+The backend retrieves only the signed-in user's relevant financial data before
+passing summarized context to the AI service. This addition does not change the
+existing expense, budget, Dashboard, authentication, or Analytics flows. See
+[requirements.md](requirements.md) for the detailed feature contract.
+
 ## Data model
 
 - **User**: case-sensitive unique username, password hash, and role (Student,
@@ -50,9 +62,9 @@ The browser does not access SQLite directly.
 
 - After a successful edit or delete operation, the expense list refreshes
   automatically while preserving active filters.
-- Analytics provides year/month/day/category selection, a category
-  distribution, and a selectable full-month comparison with the month before
-  the chosen comparison month.
+- Analytics provides year/month/day/category selection, selected-period
+  spending metrics, a category distribution, and a monthly spending-versus-
+  budget chart for the selected year.
 
 ### Add Expense popup hierarchy
 
@@ -316,7 +328,12 @@ preserving active filters.
 Reference screenshots are available in the `visuals/Analytics/` folder.
 
 Analytics provides Year, Month, Day, and Category filters; a category
-distribution and spending summary; and comparison with the previous full month.
+distribution and spending summary; and a monthly spending-versus-budget chart.
+The chart shows January through the current month for the current year and all
+months for a past year. Each point reveals its budget, spending, remaining
+amount, and budget status on desktop hover/focus or touch-screen tap. The day
+filter narrows the selected-period summary and category distribution, not the
+monthly chart.
 
 Future months and years are unavailable. Invalid period selections are rejected
 and reset to a valid period with user feedback.

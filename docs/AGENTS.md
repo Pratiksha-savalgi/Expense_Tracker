@@ -2,8 +2,8 @@
 
 ## Goal
 
-Maintain the current Expense Tracker: account access, user-scoped expense
-management, monthly budgets, and category analytics.
+Maintain SpendWise: account access, user-scoped expense management, monthly
+budgets, category analytics, and the Phase 1 AI Assistant.
 
 ## Source of truth
 
@@ -12,6 +12,8 @@ management, monthly budgets, and category analytics.
 - [design.md](design.md) describes the architecture and current data model.
 - [plan.md](plan.md) records the current structure and verification commands.
 - [tech-stack.md](tech-stack.md) records the approved technology stack.
+- [requirements.md](requirements.md) is the primary source for the Phase 1 AI
+  Assistant scope, supported intents, and acceptance criteria.
 - [../expense-tracker-team-requirements.md](../expense-tracker-team-requirements.md)
   summarizes the current feature requirements.
 - Skill files in [../.cursor/skills](../.cursor/skills) provide layer-specific
@@ -35,6 +37,19 @@ conflicting documentation rather than preserving contradictory requirements.
   exceed today.
 - Budget entry accepts any valid month/year; the analytics period restriction
   does not limit budgets.
+- Phase 1 AI Assistant work is informational and strictly read-only. Do not
+  implement expense creation, editing, or deletion; budget creation,
+  modification, or deletion; forecasting; or autonomous actions through the
+  assistant.
+- AI responses must be based only on the authenticated user's data. Query and
+  authorize that user's records before composing model context; never expose
+  another user's financial information.
+- Use Groq as the only AI provider in Phase 1. Send it only the minimum
+  summarized context retrieved for the authenticated user; never include
+  credentials or another user's financial information.
+- Preserve existing authentication, Expense Management, Dashboard, Budget
+  Tracking, and Analytics behavior when adding the assistant. See the Phase 1
+  requirements for its supported intents and response rules.
 
 ## Engineering workflow
 

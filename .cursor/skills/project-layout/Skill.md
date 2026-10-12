@@ -44,6 +44,15 @@ Examples:
 - monthly budget and analytics logic belongs in backend/ with database support
 - project intent and acceptance criteria remain in docs/
 
+## Phase 1 AI Assistant
+
+Treat the assistant as an extension of the existing application layers: chat
+presentation in the frontend, authenticated request and response handling in
+the Flask backend, and read-only user-scoped financial retrieval through the
+existing database layer. Keep the AI integration replaceable and preserve the
+Phase 1 limits in [docs/requirements.md](../../../docs/requirements.md); do not
+place financial data access or authorization in the browser.
+
 ## 5. Version 2 Layout Expectations
 
 The Version 2 work should remain consistent with the same structure:

@@ -35,9 +35,19 @@ Maintain the SQLite schema and persistence behavior described in
 
 - Filter expenses by user, and optionally category and date.
 - Calculate totals from the exact user-owned rows shown by the Expenses page.
-- Retrieve period/category analytics and budget data only for the active user.
-- Keep monthly comparison queries consistent for the selected category and
-  compare full months.
+- Retrieve period/category analytics, monthly spending totals, and budget data
+  only for the active user.
+- Keep yearly chart spending category-filtered and aggregate full calendar
+  months; never apply a selected-day filter to those chart totals.
+
+## Phase 1 AI Assistant
+
+The Phase 1 assistant is read-only and may query only records belonging to the
+authenticated user. Support data retrieval for the intents in
+[docs/requirements.md](../../../docs/requirements.md)—Total Spending, Category
+Spending, Top Expenses, Budget Status, and Month Comparison—without adding
+assistant-driven writes or exposing other users' data. Return only the
+minimum relevant query results for response generation.
 
 ## Quality
 

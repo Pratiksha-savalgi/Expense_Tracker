@@ -23,8 +23,8 @@ Tracker. Follow [docs/requirements.md](../../docs/requirements.md),
 - Apply identical date bounds to the expense list, spend/count/average/category
   summaries, and selected-period analytics.
 - Accept the Expenses date period on Analytics so its selected-period summary
-  and category distribution use the same bounds. Keep month-over-month
-  comparison behavior unchanged.
+  and category distribution use the same bounds. Keep the yearly monthly chart
+  based on full calendar months, filtered by year and category but not day.
 - Calculate Dashboard budget summaries and Analytics results using the active
   user's data.
 - Validate budget amount and calendar month/year.
@@ -52,6 +52,16 @@ validate, return, or persist either as an expense field.
   must be valid and no later than today.
 - Use `Decimal` for monetary calculations and scope every query to the active
   user.
+
+## Phase 1 AI Assistant
+
+Follow the Phase 1 contract in [docs/requirements.md](../../../docs/requirements.md).
+The assistant is strictly read-only: do not add chat actions that create, edit,
+or delete expenses or budgets, update profiles, forecast, or act autonomously.
+Its supported intents are Total Spending, Category Spending, Top Expenses,
+Budget Status, and Month Comparison. Require the authenticated user, retrieve
+only that user's minimum necessary records before generating a response, and
+never send the full database as model context.
 
 ## Current route surface
 
