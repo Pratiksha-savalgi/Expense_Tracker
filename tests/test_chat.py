@@ -1,4 +1,5 @@
 import os
+import ssl
 from datetime import date
 import json
 from pathlib import Path
@@ -21,6 +22,7 @@ from backend.app import app, database_connection  # noqa: E402
 from backend.services.ai_service import (  # noqa: E402
     AIConfigurationError,
     AIProviderError,
+    _groq_http_client,
     generate_response,
 )
 from backend.services.chat_service import answer_financial_question  # noqa: E402
@@ -211,7 +213,10 @@ class ChatAssistantTests(unittest.TestCase):
         rejected = client.post("/api/chat", json={"message": "How much did I spend?"})
         self.assertEqual(rejected.status_code, 400)
 
-        with patch("backend.services.chat_service.generate_response", return_value="You spent ₹1,200."):
+        with patch(
+            "backend.routes.chat.run_assistant",
+            return_value={"response": "You spent ₹1,200."},
+        ):
             accepted = client.post(
                 "/api/chat",
                 json={"message": "How much did I spend this month?"},
@@ -227,7 +232,7 @@ class ChatAssistantTests(unittest.TestCase):
             session["csrf_token"] = "valid-test-csrf"
 
         with patch(
-            "backend.services.chat_service.generate_response",
+            "backend.routes.chat.run_assistant",
             side_effect=AIProviderError(
                 "AI provider returned HTTP 400: model is not available",
                 status_code=400,
@@ -277,7 +282,9 @@ class ChatAssistantTests(unittest.TestCase):
             result = generate_response("How much did I spend?", {"total": "0.00"})
 
         self.assertEqual(result, "You spent ₹0.00.")
-        groq_client.assert_called_once_with(api_key="test-secret")
+        groq_client.assert_called_once()
+        self.assertEqual(groq_client.call_args.kwargs["api_key"], "test-secret")
+        self.assertIn("http_client", groq_client.call_args.kwargs)
         call = client.chat.completions.create.call_args
         self.assertEqual(call.kwargs["model"], "test-model")
         self.assertEqual(
@@ -294,6 +301,14 @@ class ChatAssistantTests(unittest.TestCase):
         self.assertIn("status_code=200", log_output)
         self.assertIn("duration_ms=", log_output)
         self.assertNotIn("test-secret", log_output)
+
+    def test_groq_http_client_uses_the_os_trust_store_and_still_verifies_tls(self):
+        client = _groq_http_client()
+        self.addCleanup(client.close)
+        context = client._transport._pool._ssl_context
+        self.assertIsInstance(context, ssl.SSLContext)
+        self.assertEqual(context.verify_mode, ssl.CERT_REQUIRED)
+        self.assertTrue(context.check_hostname)
 
     def test_provider_http_400_surfaces_sanitized_sdk_error(self):
         api_key = "groq-test-api-key"

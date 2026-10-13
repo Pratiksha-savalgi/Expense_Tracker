@@ -30,12 +30,12 @@ No additional mandatory dependency is required for the Version 2 scope. A chart 
 The Phase 1 assistant extends the existing stack with a Flask chat API
 endpoint and a dedicated Groq AI service layer using the official Groq Python
 SDK. It uses Groq's OpenAI-compatible chat-completions API with the
-`llama-3.3-70b-versatile` model by default. Configure `GROQ_API_KEY` and
+model configured by `GROQ_MODEL`. Configure `GROQ_API_KEY` and
 `GROQ_MODEL` in the server environment; credentials remain server-side.
 
-The AI service receives only the minimum summarized, authenticated-user
-context retrieved by the backend. See [requirements.md](requirements.md) for
-the read-only scope and data-access rules.
+The AI service receives only the bounded tool results retrieved for the
+authenticated user. See [ai-agent-architecture.md](ai-agent-architecture.md)
+for retrieval, mutation confirmation, and data-access rules.
 
 Provider failures log the provider name, model identifier, request duration,
 status code, and sanitized provider error detail. Credentials and

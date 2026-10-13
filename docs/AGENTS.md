@@ -37,10 +37,10 @@ conflicting documentation rather than preserving contradictory requirements.
   exceed today.
 - Budget entry accepts any valid month/year; the analytics period restriction
   does not limit budgets.
-- Phase 1 AI Assistant work is informational and strictly read-only. Do not
-  implement expense creation, editing, or deletion; budget creation,
-  modification, or deletion; forecasting; or autonomous actions through the
-  assistant.
+- Phase 1 AI Assistant answers are grounded in the signed-in user's records.
+  Expense and budget changes are off unless `ENABLE_CRUD_AGENT=1`, and even
+  then each change waits for that user's explicit confirmation. Do not add
+  forecasting or autonomous actions through the assistant.
 - AI responses must be based only on the authenticated user's data. Query and
   authorize that user's records before composing model context; never expose
   another user's financial information.

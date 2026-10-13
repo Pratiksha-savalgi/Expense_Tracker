@@ -221,11 +221,48 @@ def initialize_database():
                 UNIQUE(user_id, month, year)
             );
 
+            CREATE TABLE IF NOT EXISTS assistant_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS assistant_pending_actions (
+                id TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                action_name TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                fingerprint TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'confirmed', 'cancelled', 'expired')),
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                expires_at TEXT NOT NULL,
+                consumed_at TEXT
+            );
+
             CREATE INDEX IF NOT EXISTS expenses_by_user_date
                 ON expenses(user_id, expense_date);
 
             CREATE INDEX IF NOT EXISTS budgets_by_user_month
                 ON budgets(user_id, year, month);
+
+            CREATE INDEX IF NOT EXISTS assistant_messages_by_user
+                ON assistant_messages(user_id, id);
+
+            CREATE TABLE IF NOT EXISTS assistant_memory_focus (
+                user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                focus_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS assistant_pending_by_user
+                ON assistant_pending_actions(user_id, status, expires_at);
+
+            CREATE UNIQUE INDEX IF NOT EXISTS assistant_pending_fingerprint
+                ON assistant_pending_actions(user_id, fingerprint)
+                WHERE status = 'pending';
             """
         )
 

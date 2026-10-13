@@ -743,8 +743,6 @@ if (aiDialog) {
   const form = aiDialog.querySelector("[data-ai-form]");
   const input = form.querySelector('[name="message"]');
   const submitButton = form.querySelector("[data-ai-submit]");
-  const historyKey = `spendwise-ai-${aiDialog.dataset.userId}-${aiDialog.dataset.csrfToken}`;
-  let history = [];
 
   const renderMessage = (role, content) => {
     const message = document.createElement("article");
@@ -754,26 +752,73 @@ if (aiDialog) {
     text.textContent = content;
     message.append(text);
     messages.append(message);
+    return message;
   };
 
-  try {
-    const savedHistory = sessionStorage.getItem(historyKey);
-    const parsedHistory = savedHistory ? JSON.parse(savedHistory) : [];
-    if (
-      Array.isArray(parsedHistory)
-      && parsedHistory.every((item) => (
-        item
-        && (item.role === "user" || item.role === "assistant")
-        && typeof item.content === "string"
-      ))
-    ) {
-      history = parsedHistory;
-      history.forEach((item) => renderMessage(item.role, item.content));
+  const renderPendingAction = (pendingAction) => {
+    if (!pendingAction?.confirmation_id || !pendingAction.details) return;
+    const actions = document.createElement("div");
+    actions.className = "ai-confirmation-actions";
+    ["confirm", "cancel"].forEach((decision) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = decision === "confirm" ? "button button-primary" : "button button-outline";
+      button.textContent = decision === "confirm" ? "Confirm change" : "Cancel";
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        status.textContent = decision === "confirm"
+          ? "Applying your confirmed change…"
+          : "Cancelling the proposed change…";
+        try {
+          const response = await fetch(aiDialog.dataset.apiUrl, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRF-Token": aiDialog.dataset.csrfToken,
+            },
+            body: JSON.stringify({
+              confirmation_id: pendingAction.confirmation_id,
+              decision,
+            }),
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || "The change could not be confirmed.");
+          renderMessage("assistant", result.response);
+          actions.remove();
+          status.textContent = "";
+          messages.scrollTop = messages.scrollHeight;
+        } catch (error) {
+          status.textContent = error instanceof Error
+            ? error.message
+            : "The change could not be confirmed.";
+          button.disabled = false;
+        }
+      });
+      actions.append(button);
+    });
+    messages.append(actions);
+  };
+
+  fetch(aiDialog.dataset.apiUrl, { credentials: "same-origin" })
+    .then(async (response) => {
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Previous conversation could not be loaded.");
+      if (Array.isArray(result.messages)) {
+        result.messages.forEach((item) => {
+          if ((item.role === "user" || item.role === "assistant") && typeof item.content === "string") {
+            renderMessage(item.role, item.content);
+          }
+        });
+      }
+      if (result.pending_action) renderPendingAction(result.pending_action);
       messages.scrollTop = messages.scrollHeight;
-    }
-  } catch (error) {
-    status.textContent = "Your previous chat history could not be loaded.";
-  }
+    })
+    .catch((error) => {
+      status.textContent = error instanceof Error
+        ? error.message
+        : "Previous conversation could not be loaded.";
+    });
 
   openButton.addEventListener("click", () => {
     aiDialog.showModal();
@@ -788,7 +833,6 @@ if (aiDialog) {
     const message = input.value.trim();
     if (!message || submitButton.disabled) return;
 
-    history.push({ role: "user", content: message });
     renderMessage("user", message);
     input.value = "";
     status.textContent = "SpendWise AI is preparing your answer…";
@@ -807,14 +851,9 @@ if (aiDialog) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "SpendWise AI could not respond.");
 
-      history.push({ role: "assistant", content: result.response });
       renderMessage("assistant", result.response);
+      if (result.pending_action) renderPendingAction(result.pending_action);
       status.textContent = "";
-      try {
-        sessionStorage.setItem(historyKey, JSON.stringify(history));
-      } catch (error) {
-        status.textContent = "This conversation will not be saved for this browser session.";
-      }
       messages.scrollTop = messages.scrollHeight;
     } catch (error) {
       status.textContent = error instanceof Error
@@ -825,14 +864,5 @@ if (aiDialog) {
       input.disabled = false;
       input.focus();
     }
-  });
-  document.querySelectorAll('form[action="/logout"]').forEach((logoutForm) => {
-    logoutForm.addEventListener("submit", () => {
-      try {
-        sessionStorage.removeItem(historyKey);
-      } catch (error) {
-        status.textContent = "Chat history could not be cleared from this browser session.";
-      }
-    });
   });
 }

@@ -71,7 +71,7 @@
         <span>Ask SpendWise AI</span>
       </button>
       <dialog class="ai-dialog" data-ai-dialog data-api-url="{{ url_for('chat_api.chat') }}"
-        data-csrf-token="{{ csrf_token() }}" data-user-id="{{ session.get('user_id') }}"
+        data-csrf-token="{{ csrf_token() }}"
         aria-labelledby="ai-dialog-title">
         <section class="ai-chat">
           <header class="ai-chat-header">
@@ -90,7 +90,7 @@
               placeholder="Ask about your spending or budget…" required></textarea>
             <button class="button button-primary" type="submit" data-ai-submit>Send</button>
           </form>
-          <p class="ai-disclaimer">Read-only assistant · Uses your SpendWise records</p>
+          <p class="ai-disclaimer">Uses your SpendWise records · Changes require your confirmation</p>
         </section>
       </dialog>
       <nav class="app-mobile-nav" aria-label="Mobile navigation">

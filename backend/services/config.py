@@ -39,3 +39,20 @@ def get_missing_ai_configuration(configuration=None):
         )
         if not setting
     ]
+
+
+def feature_enabled(name, default=False):
+    load_environment()
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().casefold() in {"1", "true", "yes", "on"}
+
+
+def bounded_setting(name, default, minimum, maximum):
+    load_environment()
+    try:
+        value = int(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+    return min(max(value, minimum), maximum)

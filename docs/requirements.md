@@ -323,22 +323,27 @@ a SpendWise-focused assistant, not a general-purpose chatbot. Its goal is to
 answer natural-language questions with contextual financial summaries and
 insights, so users do not have to manually inspect lists, tables, and charts.
 
-### Phase 1 scope
+### Phased assistant behavior
 
-Phase 1 is read-only. The assistant may answer questions and provide financial
-summaries, but must not create, modify, or delete expenses or budgets; update
-profile information; or perform administrative actions.
+- The production-first path is read-only retrieval through explicitly
+  approved backend tools.
+- The model selects tools, but the backend validates arguments, injects the
+  authenticated user, and executes all database access.
+- Conversation memory is server-side, bounded, retained for a configurable
+  period, and scoped to the authenticated user.
+- Expense/budget mutation tools are feature-gated off by default. When enabled,
+  each proposed create, update, or delete requires explicit confirmation.
+- Profile and administrative changes remain unsupported.
 
 ### AI provider
 
-- Use Groq as the only AI provider, with the default model
-  `llama-3.3-70b-versatile`.
+- Use Groq as the only AI provider, with the model configured by `GROQ_MODEL`.
 - Read `GROQ_API_KEY` and `GROQ_MODEL` from server-side environment
   configuration; never expose the API key to frontend code or logs.
 - Validate both required settings at application startup, warn clearly when
   either is missing, and disable AI requests gracefully until configured.
-- Keep the provider integration within the AI service layer so provider calls
-  do not change the assistant's SpendWise data-access and intent behavior.
+- Keep provider calls within the AI service layer; database access remains in
+  backend retrieval/action services.
 
 ### User interface
 
@@ -348,7 +353,7 @@ profile information; or perform administrative actions.
   session's chat history, a natural-language question input, and generated
   responses.
 
-### Supported Phase 1 intents
+### Supported read-only questions
 
 1. **Total spending:** Return total spending for the requested period. For
    example, “How much did I spend this month?” should report the amount and
@@ -363,6 +368,10 @@ profile information; or perform administrative actions.
 5. **Month comparison:** Compare spending in two requested months and report
    the difference, percentage increase or decrease, and relevant category
    highlights.
+6. **Spending history and patterns:** Return monthly history, weekday spending,
+   yearly summaries, average yearly spending, and category changes.
+7. **Recent expenses and budget analytics:** Show recent transactions or
+   yearly monthly budget/spending figures.
 
 Example questions include:
 
@@ -381,33 +390,31 @@ Example questions include:
 - Require authentication and apply the existing authorization rules.
 - Read only records belonging to the signed-in user. Cross-user or shared
   financial data must never be accessible or disclosed.
-- Responses must be clear, concise, financially informative, and easy to read.
+- Responses must be clear, concise, financially informative, and easy to read
+  in chat: short paragraphs, Indian rupee amounts, and bullets only for a
+  short list. Do not use tables, HTML, or report headings.
+- When a question does not name a period, use the current month.
 - Use currency formatting, refer to actual recorded data, and explain
   calculations where appropriate.
 - Do not fabricate data, provide unsupported calculations, or give investment
   advice. Do not make assumptions when data is unavailable; state that the
   requested information is unavailable or ask for clarification as appropriate.
 
-### Recommended backend flow
+### Backend flow
 
 1. Receive the user's question.
-2. Identify the requested intent and any relevant period, category, or result
-   count.
-3. Query the database for only the signed-in user's data needed to answer it.
-4. Provide summarized, relevant context to the AI provider and generate a
-   contextual response.
+2. Let Groq select an approved tool and structured arguments.
+3. Validate the tool and query only the signed-in user's data.
+4. Return structured results to Groq and generate a contextual response.
 5. Return the response in the conversational interface.
 
 Do not send the entire database to the model. Database queries and
-user-ownership checks must happen before AI response generation; provide only
-the minimum summarized context needed for the answer.
+user-ownership checks must happen in the backend; provide only the bounded,
+relevant tool result needed for the answer.
 
-### Out of scope for Phase 1
-
-- Creating or modifying expenses through chat
-- Creating or modifying budgets through chat
-- Deleting expenses or budgets through chat
-- Voice assistant
+See [ai-agent-architecture.md](ai-agent-architecture.md) for the tool catalog,
+data flow, safety controls, confirmation state, memory policy, and migration
+notes. Voice interaction remains out of scope.
 - Predictions or spending forecasts
 - Smart recommendations or automated financial coaching
 

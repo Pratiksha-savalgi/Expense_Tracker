@@ -135,7 +135,7 @@ API behavior, or database schema.
   remaining, and budget-status details.
 - Empty category data is rendered as an empty state, not as an error.
 
-## Phase 1 AI Assistant
+## AI Agent assistant
 
 The Phase 1 assistant is a signed-in user's conversational, read-only way to
 ask about their own financial records. The detailed scope and security
@@ -150,18 +150,25 @@ requirements are in [requirements.md](requirements.md).
   category, top expenses, budget status, and comparisons between months.
 - When a question is unclear or the requested information is unavailable, the
   assistant asks for clarification or explains that it cannot answer from the
-  available records.
+  available records. A missing period defaults to the current month.
+- Answers are short chat paragraphs. Tables, HTML, and report headings are not
+  used.
 
 ### Request and response behavior
 
-- A request is interpreted as one of the supported Phase 1 intents, with any
-  applicable time period, category, or result count.
-- The response summarizes the relevant signed-in user's records, uses
-  appropriate currency formatting, and explains calculations when useful.
-- Responses reflect stored data; missing information is not invented.
-- The assistant provides information only. It does not perform or imply a
-  change to expenses, budgets, profiles, or administrative data.
-- Existing SpendWise workflows and behavior remain unchanged.
+- Groq selects a backend-approved retrieval tool; the backend validates its
+  arguments, injects the signed-in user, executes parameterized reads, and
+  supplies structured results for a grounded response.
+- Server-side memory is bounded, user-scoped, and supplementary context only.
+- Expense descriptions, categories, notes, memory, and retrieval output are
+  untrusted data and never override system policy.
+- The assistant cannot generate SQL or choose a user ID.
+- CRUD tools exist behind `ENABLE_CRUD_AGENT=0` by default. When enabled,
+  every mutation is validated and requires a one-use, expiring confirmation.
+- Existing expense/budget routes and the intent-based read-only path remain
+  available for migration and rollback.
+- See [ai-agent-architecture.md](ai-agent-architecture.md) for the full data
+  flow, tool registry, confirmation workflow, memory, and security model.
 
 ## Persistence
 
@@ -172,6 +179,8 @@ SQLite stores:
 - `expenses`: user ID, amount, category display value and category ID, date,
   description
 - `budgets`: user ID, month, year, amount, timestamps
+- `assistant_messages`: bounded user/assistant history, scoped by user ID
+- `assistant_pending_actions`: expiring, single-use, user-scoped confirmations
 
 Foreign keys and uniqueness constraints support ownership, deletion, and
 duplicate prevention. Database initialization creates current tables and
