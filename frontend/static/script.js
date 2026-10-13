@@ -482,7 +482,7 @@ if (dashboardFilters) {
 
   const applyFilteredDashboard = (fragment) => {
     const title = document.querySelector("#recent-expenses-title");
-    if (title) title.textContent = fragment.dataset.day ? "Expenses" : "Recent Expenses";
+    if (title) title.textContent = "Expenses";
     document.querySelectorAll("[data-budget-period]").forEach((label) => {
       if (fragment.dataset.periodLabel) label.textContent = fragment.dataset.periodLabel;
     });

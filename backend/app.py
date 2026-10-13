@@ -1028,7 +1028,7 @@ def dashboard():
     except (TypeError, ValueError):
         requested_page = 1
     requested_page = max(requested_page, 1)
-    page_size = 5
+    page_size = 10
 
     with database_connection() as connection:
         expense_rows = connection.execute(

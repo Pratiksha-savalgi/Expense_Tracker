@@ -118,27 +118,7 @@
   {% if matching_expense_count %}
   <div class="dashboard-pagination">
     <span>Showing <strong>{{ range_start }}–{{ range_end }}</strong> of <strong>{{ matching_expense_count }}</strong> {% if matching_expense_count == 1 %}expense{% else %}expenses{% endif %}</span>
-    <nav class="dashboard-page-list" aria-label="Expense pages">
-      {% if page > 1 %}
-      <a href="{{ url_for('dashboard', month=selected_month, year=selected_year, day=selected_day or none, page=page - 1) }}" data-expense-page="{{ page - 1 }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Previous</a>
-      {% else %}
-      <span class="is-disabled"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Previous</span>
-      {% endif %}
-      {% for page_number in page_numbers %}
-        {% if page_number is none %}
-        <span class="dashboard-page-gap" aria-hidden="true">…</span>
-        {% elif page_number == page %}
-        <span class="is-current" aria-current="page">{{ page_number }}</span>
-        {% else %}
-        <a href="{{ url_for('dashboard', month=selected_month, year=selected_year, day=selected_day or none, page=page_number) }}" data-expense-page="{{ page_number }}">{{ page_number }}</a>
-        {% endif %}
-      {% endfor %}
-      {% if page < page_count %}
-      <a href="{{ url_for('dashboard', month=selected_month, year=selected_year, day=selected_day or none, page=page + 1) }}" data-expense-page="{{ page + 1 }}">Next<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
-      {% else %}
-      <span class="is-disabled">Next<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>
-      {% endif %}
-    </nav>
+    <nav class="dashboard-page-list" aria-label="Expense pages">{% if page > 1 %}<a href="{{ url_for('dashboard', month=selected_month, year=selected_year, day=selected_day or none, page=page - 1) }}" data-expense-page="{{ page - 1 }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Previous</a>{% else %}<span class="is-disabled"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Previous</span>{% endif %}{% for page_number in page_numbers %}{% if page_number is none %}<span class="dashboard-page-gap" aria-hidden="true">…</span>{% elif page_number == page %}<span class="is-current" aria-current="page">{{ page_number }}</span>{% else %}<a href="{{ url_for('dashboard', month=selected_month, year=selected_year, day=selected_day or none, page=page_number) }}" data-expense-page="{{ page_number }}">{{ page_number }}</a>{% endif %}{% endfor %}{% if page < page_count %}<a href="{{ url_for('dashboard', month=selected_month, year=selected_year, day=selected_day or none, page=page + 1) }}" data-expense-page="{{ page + 1 }}">Next<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>{% else %}<span class="is-disabled">Next<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>{% endif %}</nav>
   </div>
   {% endif %}
 </div>
